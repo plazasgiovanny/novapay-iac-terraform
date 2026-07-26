@@ -1,0 +1,84 @@
+# Declaración de variables de la composición raíz. Los valores reales
+# se asignan por ambiente en dev.tfvars / prod.tfvars (sección 3.4);
+# este archivo es idéntico en envs/dev y envs/prod porque ambos
+# instancian los mismos módulos con distintos parámetros.
+
+variable "environment" {
+  description = "Nombre del ambiente."
+  type        = string
+}
+
+variable "location" {
+  description = "Región de Azure."
+  type        = string
+  default     = "eastus2"
+}
+
+variable "tenant_id" {
+  description = "ID del tenant de Microsoft Entra ID."
+  type        = string
+}
+
+variable "hub_vnet_id" {
+  description = "ID de la VNet hub compartida, gestionada fuera de este repositorio (plataforma central de conectividad)."
+  type        = string
+}
+
+variable "vnet_cidr" {
+  description = "Bloque CIDR de la VNet spoke de este ambiente."
+  type        = string
+}
+
+variable "subnets" {
+  description = "Mapa de subredes (aplicación, integración, datos, pública) con su CIDR y reglas permitidas."
+  type = map(object({
+    cidr = string
+    allowed_rules = list(object({
+      name     = string
+      priority = number
+      protocol = string
+      port     = string
+      source   = string
+    }))
+  }))
+}
+
+variable "sql_sku_name" {
+  description = "SKU de Azure SQL Database."
+  type        = string
+}
+
+variable "sql_zone_redundant" {
+  description = "Redundancia zonal de Azure SQL Database."
+  type        = bool
+}
+
+variable "aad_admin_login" {
+  description = "Nombre del grupo de Microsoft Entra ID administrador de Azure SQL."
+  type        = string
+}
+
+variable "aad_admin_object_id" {
+  description = "Object ID de ese grupo."
+  type        = string
+}
+
+variable "appservice_sku_name" {
+  description = "SKU del App Service Plan."
+  type        = string
+}
+
+variable "appservice_worker_count" {
+  description = "Número mínimo de instancias del App Service Plan."
+  type        = number
+}
+
+variable "retention_in_days" {
+  description = "Retención de logs en Log Analytics."
+  type        = number
+}
+
+variable "alert_email" {
+  description = "Correo del equipo SRE/DevOps para alertas."
+  type        = string
+}

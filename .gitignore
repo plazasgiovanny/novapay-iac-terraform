@@ -1,0 +1,31 @@
+# Directorio local de proveedores y módulos descargados por
+# "terraform init". Se regenera en cada máquina/pipeline; no aporta
+# nada versionar binarios de proveedor (reproducibilidad, sección 3.6).
+**/.terraform/
+
+# El archivo de estado NUNCA se versiona: contiene, en texto plano,
+# los valores de todos los atributos de los recursos gestionados,
+# incluidos datos sensibles. Vive exclusivamente en el backend remoto
+# azurerm (sección 3.5). Este .gitignore es en sí mismo evidencia de
+# la práctica descrita en 3.5 y 4.5.
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Registro de fallos de "terraform crash", puede contener valores
+# en memoria al momento del error.
+crash.log
+crash.*.log
+
+# Archivos de variables locales que un desarrollador pueda crear para
+# pruebas con datos reales (nombres/URLs/IDs de un tenant real). Los
+# *.tfvars versionados en este repositorio (dev.tfvars, prod.tfvars)
+# contienen únicamente placeholders ilustrativos.
+*.auto.tfvars
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Archivo de plan binario, puede contener valores sensibles resueltos.
+*.tfplan
