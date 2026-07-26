@@ -124,5 +124,7 @@ module "observability" {
     vnet         = module.networking.vnet_id
     key_vault    = module.security_keyvault.key_vault_id
     sql_database = module.data_sql.database_id
+    app_service  = module.compute_appservice.api_id
+    functions    = module.compute_appservice.functions_id
   }
 }

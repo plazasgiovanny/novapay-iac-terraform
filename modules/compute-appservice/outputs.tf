@@ -12,3 +12,13 @@ output "api_default_hostname" {
   description = "Hostname por defecto del App Service, consumido por Application Gateway como backend."
   value       = azurerm_linux_web_app.api.default_hostname
 }
+
+output "api_id" {
+  description = "ID de recurso del App Service, consumido por observability para diagnostic settings."
+  value       = azurerm_linux_web_app.api.id
+}
+
+output "functions_id" {
+  description = "ID de recurso del Function App, consumido por observability para diagnostic settings."
+  value       = azurerm_linux_function_app.async_workers.id
+}
