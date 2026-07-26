@@ -82,6 +82,8 @@ module "compute_appservice" {
   app_subnet_id                  = module.networking.subnet_ids["aplicacion"]
   sku_name                       = var.appservice_sku_name
   worker_count                   = var.appservice_worker_count
+  autoscale_min_count            = var.appservice_autoscale_min
+  autoscale_max_count            = var.appservice_autoscale_max
   key_vault_uri                  = module.security_keyvault.vault_uri
   functions_storage_account_name = azurerm_storage_account.functions.name
   functions_storage_account_id   = azurerm_storage_account.functions.id

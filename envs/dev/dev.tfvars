@@ -44,8 +44,10 @@ sql_zone_redundant  = false
 aad_admin_login     = "grp-novapay-dba"
 aad_admin_object_id = "00000000-0000-0000-0000-000000000001"
 
-appservice_sku_name     = "P1v3"
-appservice_worker_count = 1
+appservice_sku_name      = "P1v3"
+appservice_worker_count  = 1
+appservice_autoscale_min = 1
+appservice_autoscale_max = 2
 
 retention_in_days = 30
 alert_email       = "sre-novapay@example.com"

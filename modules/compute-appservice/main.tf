@@ -91,3 +91,64 @@ resource "azurerm_role_assignment" "functions_storage_access" {
   role_definition_name = "Storage Blob Data Owner"
   principal_id         = azurerm_linux_function_app.async_workers.identity[0].principal_id
 }
+
+# Autoescalado basado en CPU: materializa el requerimiento no funcional
+# "Absorber picos de tráfico sin degradación / autoescalado 5-8x el
+# promedio" (sección 1.5). Sin este recurso, worker_count sería un
+# número fijo y la elasticidad quedaría solo declarada en el papel.
+resource "azurerm_monitor_autoscale_setting" "api" {
+  name                = "autoscale-novapay-api-${var.environment}"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  target_resource_id  = azurerm_service_plan.this.id
+
+  profile {
+    name = "cpu-based"
+
+    capacity {
+      default = var.worker_count
+      minimum = var.autoscale_min_count
+      maximum = var.autoscale_max_count
+    }
+
+    rule {
+      metric_trigger {
+        metric_name        = "CpuPercentage"
+        metric_resource_id = azurerm_service_plan.this.id
+        time_grain         = "PT1M"
+        statistic          = "Average"
+        time_window        = "PT10M"
+        time_aggregation   = "Average"
+        operator           = "GreaterThan"
+        threshold          = 70
+      }
+      scale_action {
+        direction = "Increase"
+        type      = "ChangeCount"
+        value     = "1"
+        cooldown  = "PT5M"
+      }
+    }
+
+    rule {
+      metric_trigger {
+        metric_name        = "CpuPercentage"
+        metric_resource_id = azurerm_service_plan.this.id
+        time_grain         = "PT1M"
+        statistic          = "Average"
+        time_window        = "PT10M"
+        time_aggregation   = "Average"
+        operator           = "LessThan"
+        threshold          = 25
+      }
+      scale_action {
+        direction = "Decrease"
+        type      = "ChangeCount"
+        value     = "1"
+        cooldown  = "PT5M"
+      }
+    }
+  }
+
+  tags = var.tags
+}

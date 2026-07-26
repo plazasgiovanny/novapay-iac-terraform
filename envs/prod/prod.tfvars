@@ -47,10 +47,13 @@ sql_zone_redundant  = true
 aad_admin_login     = "grp-novapay-dba"
 aad_admin_object_id = "00000000-0000-0000-0000-000000000001"
 
-# 3 instancias mínimas para sostener el autoescalado 5-8x sin
-# degradación (sección 1.5); 1 en dev es suficiente para pruebas.
-appservice_sku_name     = "P2v3"
-appservice_worker_count = 3
+# 3 instancias iniciales, con perfil de autoescalado 3 a 24 (8x el
+# mínimo) para absorber picos de tráfico sin degradación (sección 1.5);
+# en dev el rango es 1-2, suficiente para pruebas.
+appservice_sku_name      = "P2v3"
+appservice_worker_count  = 3
+appservice_autoscale_min = 3
+appservice_autoscale_max = 24
 
 # Bitácora inmutable >= 5 años (1826 días) exigida por cumplimiento
 # normativo, frente a 30 días en dev (sección 1.5).

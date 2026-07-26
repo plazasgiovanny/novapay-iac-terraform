@@ -69,7 +69,17 @@ variable "appservice_sku_name" {
 }
 
 variable "appservice_worker_count" {
-  description = "Número mínimo de instancias del App Service Plan."
+  description = "Número inicial de instancias del App Service Plan."
+  type        = number
+}
+
+variable "appservice_autoscale_min" {
+  description = "Instancias mínimas del perfil de autoescalado."
+  type        = number
+}
+
+variable "appservice_autoscale_max" {
+  description = "Instancias máximas del perfil de autoescalado (techo del rango 5-8x de la sección 1.5)."
   type        = number
 }
 

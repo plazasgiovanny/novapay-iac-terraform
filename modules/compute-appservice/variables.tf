@@ -24,7 +24,17 @@ variable "sku_name" {
 }
 
 variable "worker_count" {
-  description = "Número mínimo de instancias del plan. 1 en dev, 3 en prod para sostener el autoescalado 5-8x (sección 1.5 de requerimientos no funcionales)."
+  description = "Número inicial de instancias del plan antes de que el perfil de autoescalado tome el control."
+  type        = number
+}
+
+variable "autoscale_min_count" {
+  description = "Instancias mínimas del perfil de autoescalado. 1 en dev, 3 en prod."
+  type        = number
+}
+
+variable "autoscale_max_count" {
+  description = "Instancias máximas del perfil de autoescalado. Fija el techo del rango 5-8x exigido en la sección 1.5 (requerimiento no funcional de escalabilidad)."
   type        = number
 }
 
