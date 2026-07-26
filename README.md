@@ -2,7 +2,7 @@
 
 Infraestructura como Código (Terraform + proveedor `azurerm`) para NovaPay, una fintech latinoamericana de billetera digital y pasarela de pagos. Este repositorio aprovisiona la arquitectura hub-spoke sobre Microsoft Azure descrita en la Entrega 1 de la actividad "Diseño Arquitectónico y Aprovisionamiento de Infraestructura Cloud como Código" (Maestría en Arquitectura de Software, Politécnico Grancolombiano, Módulo Construcción de Software con Tecnología Cloud, Unidad 2).
 
-El código cubre la VNet spoke, sus subredes y NSG, el backend transaccional (App Service + Functions), Azure SQL Database, Key Vault y la observabilidad centralizada — todo bajo un modelo PaaS/cloud-native, sin máquinas virtuales de propósito general.
+El código cubre la VNet spoke, sus subredes y NSG, el backend transaccional (App Service + Functions) con autoescalado basado en CPU, Azure SQL Database, Key Vault y la observabilidad centralizada — todo bajo un modelo PaaS/cloud-native, sin máquinas virtuales de propósito general.
 
 ## Estructura
 
