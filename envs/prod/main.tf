@@ -179,7 +179,7 @@ module "api_management" {
   tags                      = local.common_tags
 }
 
-# Identidad compartida por ValidarPago y ProcesarPago (un único
+# Identidad compartida por ValidatePayment y ProcessPayment (un único
 # Function App = una única identidad SystemAssigned — documento de
 # diseño de la Entrega 2, sección 5): recibe ambos roles de Service
 # Bus, acotados a la cola específica, no al namespace completo.

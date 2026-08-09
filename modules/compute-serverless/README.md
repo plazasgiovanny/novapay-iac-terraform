@@ -1,6 +1,6 @@
 # Módulo `compute-serverless`
 
-Aprovisiona el Function App `func-novapay-pagos-${env}` que aloja las dos funciones del flujo de confirmación y notificación de pagos (`ValidarPago`, HTTP trigger; `ProcesarPago`, Service Bus trigger — código de Johan). Nuevo desde la Entrega 2, deliberadamente separado del Service Plan Dedicated que usa `compute-appservice`.
+Aprovisiona el Function App `func-novapay-pagos-${env}` que aloja las dos funciones del flujo de confirmación y notificación de pagos (`ValidatePayment`, HTTP trigger; `ProcessPayment`, Service Bus trigger — código de Johan). Nuevo desde la Entrega 2, deliberadamente separado del Service Plan Dedicated que usa `compute-appservice`.
 
 ## Historial de esta decisión: Y1 → EP1 → **Flex Consumption (FC1)**
 
@@ -13,14 +13,14 @@ Aprovisiona el Function App `func-novapay-pagos-${env}` que aloja las dos funcio
 - `integracion_subnet_id` (de `networking`, subred delegada a `Microsoft.Web/serverFarms`), `max_instance_count` (sin default — obliga a decidir explícitamente por ambiente, ver más abajo), `servicebus_namespace_fqdn` (de `messaging-servicebus`), `appinsights_connection_string` (de `observability`).
 
 ## Salidas
-- `principal_id`: identidad **única**, compartida por `ValidarPago` y `ProcesarPago` — Azure Functions no tiene identidad a nivel de función individual (documento de diseño, sección 5). Se usa en la raíz para los role assignments de Service Bus y en el script SQL para el usuario contenido AAD. También es la identidad que autentica al Function App contra su propio contenedor de despliegue.
+- `principal_id`: identidad **única**, compartida por `ValidatePayment` y `ProcessPayment` — Azure Functions no tiene identidad a nivel de función individual (documento de diseño, sección 5). Se usa en la raíz para los role assignments de Service Bus y en el script SQL para el usuario contenido AAD. También es la identidad que autentica al Function App contra su propio contenedor de despliegue.
 - `default_hostname` / `function_app_id`: consumidos por `api-management` (backend HTTP y data source de host keys).
 
 ## Decisiones de diseño
 - **Contenedor de almacenamiento explícito** (`azurerm_storage_container.deployments`): Flex Consumption exige un contenedor blob específico para el paquete de despliegue — a diferencia del modelo clásico (`azurerm_linux_function_app`), no basta con apuntar a una cuenta de almacenamiento genérica.
 - **`storage_authentication_type = "SystemAssignedIdentity"`**: sin clave de cuenta de almacenamiento en configuración, mismo criterio que el resto del repositorio.
 - **Sin bloque `always_ready`**: se deja en su default (0 instancias precalentadas) deliberadamente, para no anular el cold start real que es parte del objetivo pedagógico de esta entrega.
-- **`maximum_instance_count = var.max_instance_count` (5 en dev, 15 en prod) / `instance_memory_in_mb = 2048`**: no son números arbitrarios — están reconciliados contra el límite real de concurrent workers de la Azure SQL Database reutilizada (100 workers por vCore en Gen5, fuente: Microsoft Learn — 200 en dev/`GP_Gen5_2`, 400 en prod/`BC_Gen5_4`). Se reserva como máximo ~15% de ese presupuesto para este flujo nuevo, dejando el resto para el App Service transaccional existente, cuyo consumo real de workers no está cuantificado en la Entrega 1 (limitación reconocida explícitamente, documento de diseño sección 8/9). Con la `maxConcurrentCalls` recomendada a Johan (4, ver documento de diseño sección 11), el peor caso de `ProcesarPago` es `max_instance_count × 4` workers concurrentes.
+- **`maximum_instance_count = var.max_instance_count` (5 en dev, 15 en prod) / `instance_memory_in_mb = 2048`**: no son números arbitrarios — están reconciliados contra el límite real de concurrent workers de la Azure SQL Database reutilizada (100 workers por vCore en Gen5, fuente: Microsoft Learn — 200 en dev/`GP_Gen5_2`, 400 en prod/`BC_Gen5_4`). Se reserva como máximo ~15% de ese presupuesto para este flujo nuevo, dejando el resto para el App Service transaccional existente, cuyo consumo real de workers no está cuantificado en la Entrega 1 (limitación reconocida explícitamente, documento de diseño sección 8/9). Con la `maxConcurrentCalls` recomendada a Johan (4, ver documento de diseño sección 11), el peor caso de `ProcessPayment` es `max_instance_count × 4` workers concurrentes.
 - **Conexión a Service Bus solo por FQDN + identidad administrada** (`serviceBusConnection__fullyQualifiedNamespace` / `credential = "managedidentity"`), nunca por cadena de conexión con clave — coherente con `local_auth_enabled = false` del namespace.
 
 Depende de `networking` (subred delegada), `messaging-servicebus` (FQDN) y `observability` (Application Insights) — capa 2: plataforma de ejecución, mismo nivel que `compute-appservice`.

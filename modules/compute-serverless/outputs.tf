@@ -1,5 +1,5 @@
 output "principal_id" {
-  description = "Principal ID de la identidad SystemAssigned del Function App — compartida por ValidarPago y ProcesarPago (documento de diseño, sección 5). Usado en la raíz para los role assignments de Service Bus y en el script SQL para el usuario contenido AAD."
+  description = "Principal ID de la identidad SystemAssigned del Function App — compartida por ValidatePayment y ProcessPayment (documento de diseño, sección 5). Usado en la raíz para los role assignments de Service Bus y en el script SQL para el usuario contenido AAD."
   value       = azurerm_function_app_flex_consumption.this.identity[0].principal_id
 }
 

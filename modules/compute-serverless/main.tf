@@ -92,7 +92,7 @@ resource "azurerm_function_app_flex_consumption" "this" {
   virtual_network_subnet_id = var.integracion_subnet_id
 
   # Identidad SystemAssigned única, compartida por las dos funciones
-  # que aloja este recurso (ValidarPago, ProcesarPago). Azure Functions
+  # que aloja este recurso (ValidatePayment, ProcessPayment). Azure Functions
   # no tiene identidad a nivel de función individual — ver documento de
   # diseño, sección 5. También es la identidad que autentica contra el
   # contenedor de despliegue (storage_authentication_type de arriba).

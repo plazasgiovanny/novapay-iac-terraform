@@ -1,7 +1,7 @@
 # Módulo: messaging-servicebus
 # Cola de mensajería asíncrona del flujo de confirmación y notificación
 # de pagos (Entrega 2, documento de diseño sección 2 y 4). Desacopla
-# la función ValidarPago (publica) de ProcesarPago (consume), con
+# la función ValidatePayment (publica) de ProcessPayment (consume), con
 # reintentos automáticos y dead-lettering nativos del propio servicio.
 
 resource "azurerm_servicebus_namespace" "this" {
@@ -18,10 +18,10 @@ resource "azurerm_servicebus_namespace" "this" {
   tags = var.tags
 }
 
-# Cola dedicada del evento PagoValidado. La deduplicación nativa usa
+# Cola dedicada del evento PaymentValidated. La deduplicación nativa usa
 # el MessageId del mensaje (igual al transactionId, por contrato con
 # Johan) como primera capa de idempotencia — la segunda capa es la
-# restricción UNIQUE de la tabla NotificacionesTransaccionales en
+# restricción UNIQUE de la tabla TransactionalNotifications en
 # Azure SQL (documento de diseño, sección 6).
 resource "azurerm_servicebus_queue" "pagos_pendientes" {
   name         = "sbq-novapay-pagos-pendientes-${var.environment}"
@@ -31,7 +31,7 @@ resource "azurerm_servicebus_queue" "pagos_pendientes" {
   duplicate_detection_history_time_window = "PT10M"
   lock_duration                           = "PT1M"
 
-  # Tras 5 intentos fallidos de ProcesarPago, el mensaje se mueve a la
+  # Tras 5 intentos fallidos de ProcessPayment, el mensaje se mueve a la
   # dead-letter queue nativa de la cola en vez de perderse o
   # reintentar indefinidamente (documento de diseño, sección 2, paso 6).
   max_delivery_count                   = var.max_delivery_count

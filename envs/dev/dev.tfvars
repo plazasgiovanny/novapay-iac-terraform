@@ -70,5 +70,5 @@ apim_publisher_email = "sre-novapay@example.com"
 # del presupuesto (30 workers) para este flujo nuevo, compartido con
 # el App Service transaccional existente (documento de diseño, sección
 # 8). 5 instancias x 4 concurrent calls recomendadas para Johan = 20
-# workers en el peor caso de ProcesarPago, con margen para ValidarPago.
+# workers en el peor caso de ProcessPayment, con margen para ValidatePayment.
 serverless_max_instance_count = 5
