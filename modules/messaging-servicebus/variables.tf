@@ -19,6 +19,11 @@ variable "max_delivery_count" {
   default     = 5
 }
 
+variable "action_group_id" {
+  description = "ID del grupo de acción de Azure Monitor (salida de observability), usado por la alerta de mensajes en la dead-letter queue."
+  type        = string
+}
+
 variable "tags" {
   description = "Etiquetas obligatorias aplicadas a todos los recursos de este módulo."
   type        = map(string)

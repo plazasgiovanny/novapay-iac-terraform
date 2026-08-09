@@ -70,11 +70,15 @@ resource "azurerm_function_app_flex_consumption" "this" {
   runtime_name    = "dotnet-isolated"
   runtime_version = "8.0"
 
-  # Instancias y memoria: valores de partida razonables para el
-  # volumen de prueba de esta entrega, no una proyección de carga real
-  # (documento de diseño, sección 8). Ajustar en la Fase 5 si la
-  # evidencia real de carga lo justifica.
-  maximum_instance_count = 40
+  # Techo de instancias reconciliado contra el límite REAL de Azure SQL
+  # (100 concurrent workers por vCore en Gen5 — Microsoft Learn), no un
+  # número arbitrario: reserva como máximo ~15% del presupuesto total
+  # de workers de la base de datos reutilizada para este flujo nuevo,
+  # dejando el resto para el App Service transaccional existente
+  # (documento de diseño, sección 8, con la cuenta completa mostrada).
+  # Distinto por ambiente porque el SKU de Azure SQL también lo es
+  # (GP_Gen5_2 en dev = 200 workers; BC_Gen5_4 en prod = 400).
+  maximum_instance_count = var.max_instance_count
   instance_memory_in_mb  = 2048
 
   # Deliberadamente SIN bloque "always_ready": el default (0 instancias

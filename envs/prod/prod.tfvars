@@ -72,3 +72,11 @@ alert_email       = "sre-novapay@example.com"
 # variable de SKU aquí; ver documento de diseño, sección 1 y 9.
 apim_publisher_name  = "NovaPay - Plataforma"
 apim_publisher_email = "sre-novapay@example.com"
+
+# Techo de instancias reconciliado contra el límite real de Azure SQL
+# BC_Gen5_4 (400 concurrent workers, Microsoft Learn): reserva ~15%
+# del presupuesto (60 workers) para este flujo nuevo, compartido con
+# el App Service transaccional existente (documento de diseño, sección
+# 8). 15 instancias x 4 concurrent calls recomendadas para Johan = 60
+# workers en el peor caso de ProcesarPago, con margen para ValidarPago.
+serverless_max_instance_count = 15

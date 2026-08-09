@@ -114,3 +114,8 @@ variable "apim_publisher_email" {
   type        = string
 }
 
+variable "serverless_max_instance_count" {
+  description = "Techo de instancias del Function App serverless, reconciliado contra el límite real de concurrent workers de Azure SQL (documento de diseño de la Entrega 2, sección 8: 200 workers en dev/GP_Gen5_2, 400 en prod/BC_Gen5_4). Distinto por ambiente, sin default deliberado."
+  type        = number
+}
+

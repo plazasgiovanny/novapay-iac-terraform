@@ -37,3 +37,40 @@ resource "azurerm_servicebus_queue" "pagos_pendientes" {
   max_delivery_count                   = var.max_delivery_count
   dead_lettering_on_message_expiration = true
 }
+
+# Alerta real, no solo una frase en el documento de diseño: "alguien se
+# entera" cuando un mensaje cae en la dead-letter queue. Sin esto, un
+# pago que agotó sus reintentos podría quedar silenciosamente varado
+# (documento de diseño, sección 2/11 — manejo de errores). Se escucha
+# a nivel de namespace (no de la cola directamente: azurerm/Azure no
+# soportan de forma confiable un scope de cola individual para este
+# tipo de alerta) con un filtro por EntityName.
+resource "azurerm_monitor_metric_alert" "dlq" {
+  name                = "alert-dlq-sbq-novapay-pagos-pendientes-${var.environment}"
+  resource_group_name = var.resource_group_name
+  scopes              = [azurerm_servicebus_namespace.this.id]
+  description         = "Se dispara cuando llega al menos un mensaje a la dead-letter queue de sbq-novapay-pagos-pendientes-${var.environment} — un pago agotó sus reintentos y necesita revisión manual."
+  frequency           = "PT1M"
+  window_size         = "PT5M"
+  severity            = 1
+
+  criteria {
+    metric_namespace = "Microsoft.ServiceBus/namespaces"
+    metric_name      = "DeadletteredMessages"
+    aggregation      = "Maximum"
+    operator         = "GreaterThan"
+    threshold        = 0
+
+    dimension {
+      name     = "EntityName"
+      operator = "Include"
+      values   = [azurerm_servicebus_queue.pagos_pendientes.name]
+    }
+  }
+
+  action {
+    action_group_id = var.action_group_id
+  }
+
+  tags = var.tags
+}
