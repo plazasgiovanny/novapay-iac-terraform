@@ -1,6 +1,6 @@
 # Módulo `api-management`
 
-Aprovisiona Azure API Management (Consumption) como API Gateway del flujo de confirmación y notificación de pagos: expone `POST /api/v1/pagos/confirmaciones` y enruta hacia `func-novapay-pagos-${env}`. Nuevo desde la Entrega 2 — no existía gobierno de API en la Entrega 1 (el backend transaccional se exponía directamente).
+Aprovisiona Azure API Management (Consumption) como API Gateway del flujo de confirmación y notificación de pagos: expone `POST /api/v1/payments/confirmations` y enruta hacia `func-novapay-pagos-${env}`. Nuevo desde la Entrega 2 — no existía gobierno de API en la Entrega 1 (el backend transaccional se exponía directamente).
 
 ## Por qué APIM y no Application Gateway
 

@@ -25,19 +25,19 @@ resource "azurerm_api_management_api" "pagos" {
   resource_group_name = var.resource_group_name
   api_management_name = azurerm_api_management.this.name
   revision            = "1"
-  display_name        = "NovaPay - Confirmacion de pagos"
-  path                = "api/v1/pagos"
+  display_name        = "NovaPay - Payment Confirmation"
+  path                = "api/v1/payments"
   protocols           = ["https"]
 }
 
 resource "azurerm_api_management_api_operation" "confirmaciones" {
-  operation_id        = "post-confirmaciones"
+  operation_id        = "post-confirmations"
   api_name            = azurerm_api_management_api.pagos.name
   api_management_name = azurerm_api_management.this.name
   resource_group_name = var.resource_group_name
-  display_name        = "Confirmar pago"
+  display_name        = "Confirm payment"
   method              = "POST"
-  url_template        = "/confirmaciones"
+  url_template        = "/confirmations"
 
   response {
     status_code = 202
@@ -112,7 +112,7 @@ resource "azurerm_api_management_product" "pagos" {
   product_id            = "pagos-novapay"
   resource_group_name   = var.resource_group_name
   api_management_name   = azurerm_api_management.this.name
-  display_name          = "NovaPay - Pagos"
+  display_name          = "NovaPay - Payments"
   subscription_required = true
   approval_required     = false
   published             = true
