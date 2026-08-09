@@ -20,6 +20,21 @@ resource "azurerm_subnet" "this" {
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.spoke.name
   address_prefixes     = [each.value.cidr]
+
+  # Delegación opcional: convierte la subred en exclusiva para el
+  # servicio delegado (p. ej. Microsoft.Web/serverFarms, requerido por
+  # la integración VNet regional de un plan de Consumo de Functions).
+  # Ninguna subred la usaba hasta la Entrega 2 (sección 3.3.2).
+  dynamic "delegation" {
+    for_each = each.value.delegation != null ? [each.value.delegation] : []
+    content {
+      name = delegation.value.name
+      service_delegation {
+        name    = delegation.value.service_delegation_name
+        actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
+      }
+    }
+  }
 }
 
 # Cada subred nace con un NSG propio en modo deny-by-default: el motor

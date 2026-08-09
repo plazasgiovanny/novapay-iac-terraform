@@ -30,7 +30,7 @@ variable "vnet_cidr" {
 }
 
 variable "subnets" {
-  description = "Mapa de subredes (aplicación, integración, datos, pública) con su CIDR y reglas permitidas."
+  description = "Mapa de subredes (aplicación, integración, datos, pública) con su CIDR, reglas permitidas y delegación opcional (Entrega 2: integracion se delega a Microsoft.Web/serverFarms)."
   type = map(object({
     cidr = string
     allowed_rules = list(object({
@@ -39,6 +39,10 @@ variable "subnets" {
       protocol = string
       port     = string
       source   = string
+    }))
+    delegation = optional(object({
+      name                    = string
+      service_delegation_name = string
     }))
   }))
 }
@@ -91,4 +95,22 @@ variable "retention_in_days" {
 variable "alert_email" {
   description = "Correo del equipo SRE/DevOps para alertas."
   type        = string
+}
+
+# --- Variables nuevas de la Entrega 2 (flujo serverless) ---
+
+variable "apim_publisher_name" {
+  description = "Nombre del publicador de la instancia de APIM (requerido por Azure)."
+  type        = string
+}
+
+variable "apim_publisher_email" {
+  description = "Correo del publicador de la instancia de APIM (requerido por Azure)."
+  type        = string
+}
+
+variable "function_plan_sku" {
+  description = "SKU del Service Plan del Function App serverless. Y1 = Consumo (default). EP1 = Elastic Premium, si la región no soporta integración VNet regional en Consumo Linux (documento de diseño de la Entrega 2, sección 9)."
+  type        = string
+  default     = "Y1"
 }

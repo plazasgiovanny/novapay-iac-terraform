@@ -56,6 +56,38 @@ module "security_keyvault" {
   tags                = local.common_tags
 }
 
+# --- Capa 3, adelantada: observability se declara aquí (no al final del
+# archivo) porque compute_serverless (capa 2, abajo) consume su salida
+# appinsights_connection_string. Terraform resuelve por grafo de
+# dependencias, no por orden textual del archivo, así que esto no
+# reintroduce una capa 3 que dependa "hacia abajo" de la capa 2 en el
+# sentido conceptual: monitored_resource_ids sigue recibiendo, no
+# generando, los IDs de las capas 1 y 2 (incluida compute_serverless,
+# declarada más abajo) — es la misma relación transversal de siempre,
+# solo que Application Insights nace antes en el grafo real porque
+# alguien de la capa 2 la necesita como entrada.
+module "observability" {
+  source = "../../modules/observability"
+
+  environment         = var.environment
+  location            = var.location
+  resource_group_name = azurerm_resource_group.this.name
+  retention_in_days   = var.retention_in_days
+  alert_email         = var.alert_email
+  tags                = local.common_tags
+
+  monitored_resource_ids = {
+    vnet         = module.networking.vnet_id
+    key_vault    = module.security_keyvault.key_vault_id
+    sql_database = module.data_sql.database_id
+    app_service  = module.compute_appservice.api_id
+    functions    = module.compute_appservice.functions_id
+    service_bus  = module.messaging_servicebus.namespace_id
+    apim         = module.api_management.id
+    func_pagos   = module.compute_serverless.function_app_id
+  }
+}
+
 # --- Capa 2: plataforma de ejecución (depende de la capa 1) ---
 
 module "data_sql" {
@@ -108,25 +140,56 @@ resource "azurerm_role_assignment" "functions_kv_secrets_user" {
   principal_id         = module.compute_appservice.functions_principal_id
 }
 
-# --- Capa 3: observabilidad (transversal a las capas 1 y 2) ---
+# --- Capa 2, continuación: flujo serverless (Entrega 2) ---
 
-module "observability" {
-  source = "../../modules/observability"
+module "messaging_servicebus" {
+  source = "../../modules/messaging-servicebus"
 
   environment         = var.environment
   location            = var.location
   resource_group_name = azurerm_resource_group.this.name
-  retention_in_days   = var.retention_in_days
-  alert_email         = var.alert_email
   tags                = local.common_tags
+}
 
-  # Se observan las capas 1 y 2 sin que el módulo observability
-  # necesite conocer su tipo (contrato de la sección 3.3).
-  monitored_resource_ids = {
-    vnet         = module.networking.vnet_id
-    key_vault    = module.security_keyvault.key_vault_id
-    sql_database = module.data_sql.database_id
-    app_service  = module.compute_appservice.api_id
-    functions    = module.compute_appservice.functions_id
-  }
+module "compute_serverless" {
+  source = "../../modules/compute-serverless"
+
+  environment                   = var.environment
+  location                      = var.location
+  resource_group_name           = azurerm_resource_group.this.name
+  integracion_subnet_id         = module.networking.subnet_ids["integracion"]
+  function_plan_sku             = var.function_plan_sku
+  servicebus_namespace_fqdn     = module.messaging_servicebus.namespace_fqdn
+  appinsights_connection_string = module.observability.appinsights_connection_string
+  tags                          = local.common_tags
+}
+
+module "api_management" {
+  source = "../../modules/api-management"
+
+  environment               = var.environment
+  location                  = var.location
+  resource_group_name       = azurerm_resource_group.this.name
+  publisher_name            = var.apim_publisher_name
+  publisher_email           = var.apim_publisher_email
+  function_app_name         = module.compute_serverless.function_app_name
+  function_app_id           = module.compute_serverless.function_app_id
+  function_default_hostname = module.compute_serverless.default_hostname
+  tags                      = local.common_tags
+}
+
+# Identidad compartida por ValidarPago y ProcesarPago (un único
+# Function App = una única identidad SystemAssigned — documento de
+# diseño de la Entrega 2, sección 5): recibe ambos roles de Service
+# Bus, acotados a la cola específica, no al namespace completo.
+resource "azurerm_role_assignment" "func_pagos_sb_sender" {
+  scope                = module.messaging_servicebus.queue_id
+  role_definition_name = "Azure Service Bus Data Sender"
+  principal_id         = module.compute_serverless.principal_id
+}
+
+resource "azurerm_role_assignment" "func_pagos_sb_receiver" {
+  scope                = module.messaging_servicebus.queue_id
+  role_definition_name = "Azure Service Bus Data Receiver"
+  principal_id         = module.compute_serverless.principal_id
 }

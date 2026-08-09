@@ -30,6 +30,12 @@ subnets = {
     allowed_rules = [
       { name = "allow-from-aplicacion", priority = 100, protocol = "Tcp", port = "443", source = "10.20.2.0/24" }
     ]
+    # Delegada desde la Entrega 2: requerida por la integración VNet
+    # regional del Function App de plan de Consumo (modules/compute-serverless).
+    delegation = {
+      name                    = "delegation-serverless"
+      service_delegation_name = "Microsoft.Web/serverFarms"
+    }
   }
   datos = {
     cidr = "10.20.4.0/24"
@@ -59,3 +65,12 @@ appservice_autoscale_max = 24
 # normativo, frente a 30 días en dev (sección 1.5).
 retention_in_days = 1826
 alert_email       = "sre-novapay@example.com"
+
+# Flujo serverless (Entrega 2). function_plan_sku se deja en Y1 por
+# defecto; se evalúa EP1 en la Fase 5 solo si la región elegida no
+# soporta integración VNet regional en Consumo Linux (documento de
+# diseño de la Entrega 2, sección 9) o si se requiere el SLA/aislamiento
+# adicional de un plan siempre activo.
+apim_publisher_name  = "NovaPay - Plataforma"
+apim_publisher_email = "sre-novapay@example.com"
+function_plan_sku    = "Y1"

@@ -26,8 +26,12 @@ variable "hub_vnet_id" {
 variable "subnets" {
   description = <<-EOT
     Mapa de subredes a crear. La clave es el nombre lógico de la subred
-    (aplicacion, integracion, datos, publica) y el valor define su CIDR
-    y las reglas de entrada explícitamente permitidas (deny-by-default).
+    (aplicacion, integracion, datos, publica) y el valor define su CIDR,
+    las reglas de entrada explícitamente permitidas (deny-by-default), y
+    opcionalmente una delegación de servicio (p. ej. Microsoft.Web/serverFarms
+    para integración VNet regional de un plan de Consumo de Azure Functions).
+    `delegation = null` (el default) deja la subred sin delegar, igual que
+    hoy — una subred delegada queda exclusiva para ese tipo de servicio.
   EOT
   type = map(object({
     cidr = string
@@ -37,6 +41,10 @@ variable "subnets" {
       protocol = string
       port     = string
       source   = string
+    }))
+    delegation = optional(object({
+      name                    = string
+      service_delegation_name = string
     }))
   }))
 }
