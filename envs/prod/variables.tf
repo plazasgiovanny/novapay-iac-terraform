@@ -17,16 +17,19 @@ variable "location" {
 variable "tenant_id" {
   description = "ID del tenant de Microsoft Entra ID."
   type        = string
+  sensitive   = true
 }
 
 variable "subscription_id" {
   description = "ID de la suscripción de Azure. Obligatorio para el provider desde azurerm 4.x (antes se inferían solo del contexto de Azure CLI)."
   type        = string
+  sensitive   = true
 }
 
 variable "hub_vnet_id" {
   description = "ID de la VNet hub compartida, gestionada fuera de este repositorio (plataforma central de conectividad)."
   type        = string
+  sensitive   = true
 }
 
 variable "vnet_cidr" {
@@ -71,6 +74,7 @@ variable "aad_admin_login" {
 variable "aad_admin_object_id" {
   description = "Object ID de ese grupo."
   type        = string
+  sensitive   = true
 }
 
 variable "appservice_sku_name" {
@@ -101,6 +105,7 @@ variable "retention_in_days" {
 variable "alert_email" {
   description = "Correo del equipo SRE/DevOps para alertas."
   type        = string
+  sensitive   = true
 }
 
 variable "keyvault_name_suffix" {
@@ -113,6 +118,7 @@ variable "deployer_principal_id" {
   description = "Object ID de la identidad (usuario o service principal) que recibe el rol 'Website Contributor' acotado al Function App serverless, para poder publicar código sin credenciales de larga duración. Vacío por defecto (nadie recibe el rol)."
   type        = string
   default     = ""
+  sensitive   = true
 }
 
 # --- Variables del flujo serverless ---
@@ -125,6 +131,7 @@ variable "apim_publisher_name" {
 variable "apim_publisher_email" {
   description = "Correo del publicador de la instancia de APIM (requerido por Azure)."
   type        = string
+  sensitive   = true
 }
 
 variable "serverless_max_instance_count" {

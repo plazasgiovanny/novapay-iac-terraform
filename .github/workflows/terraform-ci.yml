@@ -1,0 +1,79 @@
+name: terraform-ci
+
+# Valida el código Terraform de prod en cada Pull Request hacia main: fmt,
+# validate y plan. Es de solo lectura contra Azure (plan no modifica nada),
+# así que corre sin gate de aprobación humana.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "modules/**"
+      - "envs/prod/**"
+      - "policies/**"
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: terraform-prod
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: envs/prod
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: "1.9.8"
+          terraform_wrapper: false
+
+      - uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: terraform fmt
+        run: terraform fmt -check -recursive ..
+
+      - name: terraform init
+        run: terraform init -backend-config=backend.hcl
+        env:
+          ARM_USE_OIDC: "true"
+          ARM_USE_AZUREAD: "true"
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: terraform validate
+        run: terraform validate
+
+      - name: terraform plan
+        run: |
+          terraform plan -input=false -var-file=prod.tfvars -no-color | tee plan_output.txt
+          {
+            echo "### Terraform plan — prod (PR #${{ github.event.pull_request.number }})"
+            echo '```'
+            cat plan_output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          ARM_USE_OIDC: "true"
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          TF_VAR_tenant_id: ${{ secrets.TF_VAR_TENANT_ID }}
+          TF_VAR_subscription_id: ${{ secrets.TF_VAR_SUBSCRIPTION_ID }}
+          TF_VAR_hub_vnet_id: ${{ secrets.TF_VAR_HUB_VNET_ID }}
+          TF_VAR_aad_admin_object_id: ${{ secrets.TF_VAR_AAD_ADMIN_OBJECT_ID }}
+          TF_VAR_deployer_principal_id: ${{ secrets.TF_VAR_DEPLOYER_PRINCIPAL_ID }}
+          TF_VAR_alert_email: ${{ secrets.TF_VAR_ALERT_EMAIL }}
+          TF_VAR_apim_publisher_email: ${{ secrets.TF_VAR_APIM_PUBLISHER_EMAIL }}
