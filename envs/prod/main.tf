@@ -1,6 +1,6 @@
 # Composición raíz del ambiente prod. Instancia los mismos módulos que
 # dev (envs/dev/main.tf), con SKU de mayor capacidad y redundancia
-# zonal habilitada para sostener el SLA >= 99.95% (sección 3.4).
+# zonal habilitada para sostener el SLA >= 99.95%.
 
 # Etiquetas obligatorias: ningún módulo puede omitirlas porque se
 # inyectan de forma centralizada. "policies/require-tags.json"
@@ -54,6 +54,34 @@ module "security_keyvault" {
   tenant_id           = var.tenant_id
   data_subnet_id      = module.networking.subnet_ids["datos"]
   tags                = local.common_tags
+  name_suffix         = var.keyvault_name_suffix
+}
+
+# Capa 3, adelantada: observability se declara aquí (no al final del
+# archivo) porque compute_serverless, más abajo, consume su salida
+# appinsights_connection_string. Terraform resuelve por grafo de
+# dependencias, no por orden textual del archivo: monitored_resource_ids
+# sigue recibiendo, no generando, los IDs de las demás capas.
+module "observability" {
+  source = "../../modules/observability"
+
+  environment         = var.environment
+  location            = var.location
+  resource_group_name = azurerm_resource_group.this.name
+  retention_in_days   = var.retention_in_days
+  alert_email         = var.alert_email
+  tags                = local.common_tags
+
+  monitored_resource_ids = {
+    vnet         = module.networking.vnet_id
+    key_vault    = module.security_keyvault.key_vault_id
+    sql_database = module.data_sql.database_id
+    app_service  = module.compute_appservice.api_id
+    functions    = module.compute_appservice.functions_id
+    service_bus  = module.messaging_servicebus.namespace_id
+    apim         = module.api_management.id
+    func_pagos   = module.compute_serverless.function_app_id
+  }
 }
 
 # --- Capa 2: plataforma de ejecución (depende de la capa 1) ---
@@ -93,9 +121,8 @@ module "compute_appservice" {
 # Asignaciones de rol que cruzan capa 1 y capa 2: viven en la raíz
 # para no introducir una dependencia circular entre security-keyvault
 # y compute-appservice (ver nota en modules/security-keyvault/main.tf).
-# Materializan el principio de mínimo privilegio de la sección 4.3:
-# cada identidad recibe únicamente el rol que necesita, sobre el
-# alcance mínimo (el vault, no la suscripción completa).
+# Mínimo privilegio: cada identidad recibe únicamente el rol que
+# necesita, sobre el alcance mínimo (el vault, no la suscripción completa).
 resource "azurerm_role_assignment" "api_kv_secrets_user" {
   scope                = module.security_keyvault.key_vault_id
   role_definition_name = "Key Vault Secrets User"
@@ -108,25 +135,69 @@ resource "azurerm_role_assignment" "functions_kv_secrets_user" {
   principal_id         = module.compute_appservice.functions_principal_id
 }
 
-# --- Capa 3: observabilidad (transversal a las capas 1 y 2) ---
+# --- Capa 2, continuación: flujo serverless de confirmación de pagos ---
 
-module "observability" {
-  source = "../../modules/observability"
+module "messaging_servicebus" {
+  source = "../../modules/messaging-servicebus"
 
   environment         = var.environment
   location            = var.location
   resource_group_name = azurerm_resource_group.this.name
-  retention_in_days   = var.retention_in_days
-  alert_email         = var.alert_email
+  action_group_id     = module.observability.action_group_id
   tags                = local.common_tags
+}
 
-  # Se observan las capas 1 y 2 sin que el módulo observability
-  # necesite conocer su tipo (contrato de la sección 3.3).
-  monitored_resource_ids = {
-    vnet         = module.networking.vnet_id
-    key_vault    = module.security_keyvault.key_vault_id
-    sql_database = module.data_sql.database_id
-    app_service  = module.compute_appservice.api_id
-    functions    = module.compute_appservice.functions_id
-  }
+module "compute_serverless" {
+  source = "../../modules/compute-serverless"
+
+  environment                   = var.environment
+  location                      = var.location
+  resource_group_name           = azurerm_resource_group.this.name
+  integracion_subnet_id         = module.networking.subnet_ids["integracion"]
+  max_instance_count            = var.serverless_max_instance_count
+  servicebus_namespace_fqdn     = module.messaging_servicebus.namespace_fqdn
+  appinsights_connection_string = module.observability.appinsights_connection_string
+  tags                          = local.common_tags
+}
+
+module "api_management" {
+  source = "../../modules/api-management"
+
+  environment               = var.environment
+  location                  = var.location
+  resource_group_name       = azurerm_resource_group.this.name
+  publisher_name            = var.apim_publisher_name
+  publisher_email           = var.apim_publisher_email
+  function_app_name         = module.compute_serverless.function_app_name
+  function_app_id           = module.compute_serverless.function_app_id
+  function_default_hostname = module.compute_serverless.default_hostname
+  tags                      = local.common_tags
+}
+
+# Identidad compartida por ValidatePayment y ProcessPayment (un único
+# Function App = una única identidad SystemAssigned): recibe ambos
+# roles de Service Bus, acotados a la cola específica, no al namespace
+# completo.
+resource "azurerm_role_assignment" "func_pagos_sb_sender" {
+  scope                = module.messaging_servicebus.queue_id
+  role_definition_name = "Azure Service Bus Data Sender"
+  principal_id         = module.compute_serverless.principal_id
+}
+
+resource "azurerm_role_assignment" "func_pagos_sb_receiver" {
+  scope                = module.messaging_servicebus.queue_id
+  role_definition_name = "Azure Service Bus Data Receiver"
+  principal_id         = module.compute_serverless.principal_id
+}
+
+# Acceso de despliegue acotado al Function App serverless, solo para
+# quien vaya a publicar el código de la función — nunca por publish
+# profile (credencial SCM de larga duración), sino por rol RBAC
+# revocable, coherente con el resto del proyecto (sin secretos
+# gestionados manualmente).
+resource "azurerm_role_assignment" "func_pagos_deployer" {
+  count                = var.deployer_principal_id != "" ? 1 : 0
+  scope                = module.compute_serverless.function_app_id
+  role_definition_name = "Website Contributor"
+  principal_id         = var.deployer_principal_id
 }

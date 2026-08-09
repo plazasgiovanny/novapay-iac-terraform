@@ -14,7 +14,7 @@ variable "resource_group_name" {
 }
 
 variable "retention_in_days" {
-  description = "Retención de logs en Log Analytics. 30 días en dev, >= 5 años (1826 días) en prod para la bitácora inmutable exigida por cumplimiento (sección 1.5)."
+  description = "Retención de logs en Log Analytics. 30 días en dev, >= 5 años (1826 días) en prod para la bitácora inmutable exigida por cumplimiento normativo."
   type        = number
 }
 

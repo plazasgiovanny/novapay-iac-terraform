@@ -27,3 +27,9 @@ variable "tags" {
   description = "Etiquetas obligatorias."
   type        = map(string)
 }
+
+variable "name_suffix" {
+  description = "Sufijo opcional para el nombre del Key Vault. Los nombres de Key Vault son únicos globalmente en Azure y, con purge_protection_enabled = true, un vault destruido queda en soft-delete sin poder purgarse hasta que expire su retención — este sufijo permite reusar el módulo con un nombre distinto mientras tanto, en vez de bloquear el despliegue."
+  type        = string
+  default     = ""
+}

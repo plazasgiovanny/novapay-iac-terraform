@@ -1,11 +1,11 @@
 # Módulo: security-keyvault
 # Custodia de secretos y llaves. Autorización basada en roles de Azure
 # (RBAC) en lugar de políticas de acceso heredadas, para que el
-# principio de mínimo privilegio (sección 4.3) se exprese como
-# asignaciones de rol auditables e independientes del recurso.
+# principio de mínimo privilegio se exprese como asignaciones de rol
+# auditables e independientes del recurso.
 
 resource "azurerm_key_vault" "this" {
-  name                = "kv-novapay-${var.environment}"
+  name                = "kv-novapay-${var.environment}${var.name_suffix}"
   location            = var.location
   resource_group_name = var.resource_group_name
   tenant_id           = var.tenant_id
@@ -13,8 +13,8 @@ resource "azurerm_key_vault" "this" {
 
   # RBAC en vez de access policies: cada concesión de acceso queda
   # como una asignación de rol de Azure, versionable y auditable
-  # desde el mismo plano de control de IAM (sección 4.2).
-  enable_rbac_authorization = true
+  # desde el mismo plano de control de IAM.
+  rbac_authorization_enabled = true
 
   # La eliminación definitiva requiere una acción explícita adicional:
   # evita que un "destroy" accidental borre secretos de forma
@@ -23,7 +23,7 @@ resource "azurerm_key_vault" "this" {
   soft_delete_retention_days = 90
 
   # Sin endpoint público: todo el acceso ocurre por Private Endpoint
-  # desde la subred de datos (mismo patrón que Azure SQL, sección 3.7).
+  # desde la subred de datos (mismo patrón que Azure SQL).
   public_network_access_enabled = false
 
   network_acls {
@@ -58,5 +58,4 @@ resource "azurerm_private_endpoint" "keyvault" {
 # este módulo) para arrancar: si este módulo dependiera a su vez de
 # las identidades de compute-appservice, el grafo de módulos sería
 # circular. La asignación de rol, al vivir en la raíz, referencia
-# ambos módulos sin que ninguno dependa del otro (sección 3.3,
-# "composición" como alternativa a anidar módulos).
+# ambos módulos sin que ninguno dependa del otro.

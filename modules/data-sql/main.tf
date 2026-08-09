@@ -11,7 +11,7 @@ resource "azurerm_mssql_server" "this" {
 
   # El servidor no expone endpoint público: todo el acceso ocurre por
   # Private Endpoint dentro de la subred de datos. Esta decisión
-  # reduce directamente el alcance de cumplimiento PCI DSS (sección 4.4).
+  # reduce directamente el alcance de cumplimiento PCI DSS.
   public_network_access_enabled = false
 
   identity {
@@ -20,7 +20,7 @@ resource "azurerm_mssql_server" "this" {
 
   # Administración exclusiva por Microsoft Entra ID: se elimina el
   # usuario/contraseña "sa" desde el aprovisionamiento, en lugar de
-  # custodiar esa credencial (jerarquía de decisión de la sección 4.5).
+  # custodiar esa credencial.
   azuread_administrator {
     login_username              = var.aad_admin_login
     object_id                   = var.aad_admin_object_id
@@ -37,7 +37,7 @@ resource "azurerm_mssql_database" "core" {
   sku_name  = var.sku_name
 
   # Redundancia zonal en producción: réplicas síncronas y conmutación
-  # por error automática que sostienen el SLA >= 99.95% (sección 1.5).
+  # por error automática que sostienen el SLA >= 99.95%.
   zone_redundant = var.zone_redundant
 
   tags = var.tags
@@ -59,12 +59,12 @@ resource "azurerm_private_endpoint" "sql" {
   tags = var.tags
 }
 
-# Nota de gobierno (sección 4.5): las identidades administradas de
-# App Service y Functions (salidas de compute-appservice) se mapean
-# como usuarios contenidos en la base de datos ("CREATE USER
-# [app-novapay-api] FROM EXTERNAL PROVIDER") mediante un script T-SQL
-# versionado que el pipeline ejecuta tras el "apply" (sección 5). No
-# es un recurso de azurerm: la creación de usuarios contenidos ocurre
-# dentro del motor de la base de datos, no en el plano de control de
-# Azure Resource Manager, y por tanto queda fuera del alcance de este
-# módulo — se documenta aquí para que la frontera quede explícita.
+# Nota de gobierno: las identidades administradas de App Service y
+# Functions (salidas de compute-appservice) se mapean como usuarios
+# contenidos en la base de datos ("CREATE USER [app-novapay-api] FROM
+# EXTERNAL PROVIDER") mediante un script T-SQL versionado que el
+# pipeline ejecuta tras el "apply". No es un recurso de azurerm: la
+# creación de usuarios contenidos ocurre dentro del motor de la base
+# de datos, no en el plano de control de Azure Resource Manager, y
+# por tanto queda fuera del alcance de este módulo — se documenta
+# aquí para que la frontera quede explícita.

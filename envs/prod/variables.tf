@@ -1,7 +1,7 @@
 # Declaración de variables de la composición raíz. Los valores reales
-# se asignan por ambiente en dev.tfvars / prod.tfvars (sección 3.4);
-# este archivo es idéntico en envs/dev y envs/prod porque ambos
-# instancian los mismos módulos con distintos parámetros.
+# se asignan por ambiente en dev.tfvars / prod.tfvars; este archivo es
+# idéntico en envs/dev y envs/prod porque ambos instancian los mismos
+# módulos con distintos parámetros.
 
 variable "environment" {
   description = "Nombre del ambiente."
@@ -17,11 +17,19 @@ variable "location" {
 variable "tenant_id" {
   description = "ID del tenant de Microsoft Entra ID."
   type        = string
+  sensitive   = true
+}
+
+variable "subscription_id" {
+  description = "ID de la suscripción de Azure. Obligatorio para el provider desde azurerm 4.x (antes se inferían solo del contexto de Azure CLI)."
+  type        = string
+  sensitive   = true
 }
 
 variable "hub_vnet_id" {
   description = "ID de la VNet hub compartida, gestionada fuera de este repositorio (plataforma central de conectividad)."
   type        = string
+  sensitive   = true
 }
 
 variable "vnet_cidr" {
@@ -30,7 +38,7 @@ variable "vnet_cidr" {
 }
 
 variable "subnets" {
-  description = "Mapa de subredes (aplicación, integración, datos, pública) con su CIDR y reglas permitidas."
+  description = "Mapa de subredes (aplicación, integración, datos, pública) con su CIDR, reglas permitidas y delegación opcional (integracion se delega a Microsoft.Web/serverFarms)."
   type = map(object({
     cidr = string
     allowed_rules = list(object({
@@ -39,6 +47,11 @@ variable "subnets" {
       protocol = string
       port     = string
       source   = string
+    }))
+    delegation = optional(object({
+      name                    = string
+      service_delegation_name = string
+      actions                 = optional(list(string), ["Microsoft.Network/virtualNetworks/subnets/action"])
     }))
   }))
 }
@@ -61,6 +74,7 @@ variable "aad_admin_login" {
 variable "aad_admin_object_id" {
   description = "Object ID de ese grupo."
   type        = string
+  sensitive   = true
 }
 
 variable "appservice_sku_name" {
@@ -79,7 +93,7 @@ variable "appservice_autoscale_min" {
 }
 
 variable "appservice_autoscale_max" {
-  description = "Instancias máximas del perfil de autoescalado (techo del rango 5-8x de la sección 1.5)."
+  description = "Instancias máximas del perfil de autoescalado (techo del rango 5-8x el promedio ante picos de tráfico)."
   type        = number
 }
 
@@ -91,4 +105,37 @@ variable "retention_in_days" {
 variable "alert_email" {
   description = "Correo del equipo SRE/DevOps para alertas."
   type        = string
+  sensitive   = true
 }
+
+variable "keyvault_name_suffix" {
+  description = "Sufijo opcional para el nombre del Key Vault, usado para evitar colisión con un vault soft-deleted de un despliegue anterior (ver modules/security-keyvault/variables.tf)."
+  type        = string
+  default     = ""
+}
+
+variable "deployer_principal_id" {
+  description = "Object ID de la identidad (usuario o service principal) que recibe el rol 'Website Contributor' acotado al Function App serverless, para poder publicar código sin credenciales de larga duración. Vacío por defecto (nadie recibe el rol)."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+# --- Variables del flujo serverless ---
+
+variable "apim_publisher_name" {
+  description = "Nombre del publicador de la instancia de APIM (requerido por Azure)."
+  type        = string
+}
+
+variable "apim_publisher_email" {
+  description = "Correo del publicador de la instancia de APIM (requerido por Azure)."
+  type        = string
+  sensitive   = true
+}
+
+variable "serverless_max_instance_count" {
+  description = "Techo de instancias del Function App serverless, reconciliado contra el límite real de concurrent workers de Azure SQL (200 workers en dev/GP_Gen5_2, 400 en prod/BC_Gen5_4). Distinto por ambiente, sin default deliberado."
+  type        = number
+}
+

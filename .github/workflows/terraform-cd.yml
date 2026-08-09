@@ -1,0 +1,134 @@
+name: terraform-cd
+
+# Aplica el código Terraform de prod contra Azure real al publicar un
+# GitHub Release. Dos jobs: "plan" calcula y publica el plan sin gate;
+# "apply" corre bajo el Environment "production" (aprobación humana
+# obligatoria + subject OIDC propio) y aplica exactamente el plan
+# guardado por el job anterior, no uno recalculado a ciegas.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: terraform-prod
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: envs/prod
+    # A nivel de job: cada invocación de "terraform" que toca el backend
+    # remoto (init, plan) reautentica por separado — si estas variables
+    # solo vivieran en el step de "init", "plan" caería a autenticación
+    # por clave de la cuenta de almacenamiento y fallaría con 403 (el
+    # Service Principal solo tiene RBAC de datos, no listKeys).
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_USE_AZUREAD: "true"
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: "1.9.8"
+          terraform_wrapper: false
+
+      - uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: terraform init
+        run: terraform init -backend-config=backend.hcl
+
+      - name: terraform plan
+        run: |
+          set -euo pipefail
+          # prod.tfvars (versionado) solo trae placeholders. -var-file en la
+          # línea de comandos tiene MÁS prioridad que las variables de
+          # entorno TF_VAR_*, así que un TF_VAR_* nunca podría sobrescribir
+          # lo que ya viene de -var-file=prod.tfvars: hace falta un segundo
+          # -var-file generado en el runner, igual que local.tfvars en local.
+          jq -n \
+            --arg tenant_id "$TENANT_ID" \
+            --arg subscription_id "$SUBSCRIPTION_ID" \
+            --arg hub_vnet_id "$HUB_VNET_ID" \
+            --arg aad_admin_object_id "$AAD_ADMIN_OBJECT_ID" \
+            --arg deployer_principal_id "$DEPLOYER_PRINCIPAL_ID" \
+            --arg alert_email "$ALERT_EMAIL" \
+            --arg apim_publisher_email "$APIM_PUBLISHER_EMAIL" \
+            '{tenant_id:$tenant_id, subscription_id:$subscription_id, hub_vnet_id:$hub_vnet_id, aad_admin_object_id:$aad_admin_object_id, deployer_principal_id:$deployer_principal_id, alert_email:$alert_email, apim_publisher_email:$apim_publisher_email}' \
+            > ci.tfvars.json
+
+          terraform plan -input=false -var-file=prod.tfvars -var-file=ci.tfvars.json -out=tfplan -no-color | tee plan_output.txt
+          {
+            echo "### Terraform plan — prod (release ${{ github.event.release.tag_name }})"
+            echo '```'
+            cat plan_output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          TENANT_ID: ${{ secrets.TF_VAR_TENANT_ID }}
+          SUBSCRIPTION_ID: ${{ secrets.TF_VAR_SUBSCRIPTION_ID }}
+          HUB_VNET_ID: ${{ secrets.TF_VAR_HUB_VNET_ID }}
+          AAD_ADMIN_OBJECT_ID: ${{ secrets.TF_VAR_AAD_ADMIN_OBJECT_ID }}
+          DEPLOYER_PRINCIPAL_ID: ${{ secrets.TF_VAR_DEPLOYER_PRINCIPAL_ID }}
+          ALERT_EMAIL: ${{ secrets.TF_VAR_ALERT_EMAIL }}
+          APIM_PUBLISHER_EMAIL: ${{ secrets.TF_VAR_APIM_PUBLISHER_EMAIL }}
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tfplan-prod-${{ github.run_id }}
+          path: envs/prod/tfplan
+          retention-days: 3
+
+  apply:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    defaults:
+      run:
+        working-directory: envs/prod
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_USE_AZUREAD: "true"
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: "1.9.8"
+          terraform_wrapper: false
+
+      - uses: azure/login@f5d393ae46f8fde4be8b75f32e3fc50e654ad0ca # v3.0.1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: terraform init
+        run: terraform init -backend-config=backend.hcl
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: tfplan-prod-${{ github.run_id }}
+          path: envs/prod
+
+      - name: terraform apply
+        run: terraform apply -input=false tfplan

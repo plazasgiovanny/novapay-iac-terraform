@@ -1,5 +1,5 @@
 output "api_principal_id" {
-  description = "Object ID de la identidad administrada del App Service. Se usa para autorizarla en Key Vault y Azure SQL (mínimo privilegio, sección 4.3)."
+  description = "Object ID de la identidad administrada del App Service. Se usa para autorizarla en Key Vault y Azure SQL (mínimo privilegio)."
   value       = azurerm_linux_web_app.api.identity[0].principal_id
 }
 
