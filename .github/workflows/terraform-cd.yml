@@ -22,6 +22,13 @@ jobs:
   plan:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Sin "environment:", el subject OIDC por defecto de un job disparado
+    # por "release" es "ref:refs/tags/<tag>" — distinto por cada release,
+    # impráctico para una federated credential (subject exacto, sin
+    # comodines). "production-plan" es un Environment sin reglas de
+    # protección (sin reviewers): sirve solo para fijar un subject OIDC
+    # estable, no para gatear este job de solo lectura.
+    environment: production-plan
     defaults:
       run:
         working-directory: envs/prod
