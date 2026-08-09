@@ -55,7 +55,24 @@ jobs:
 
       - name: terraform plan
         run: |
-          terraform plan -input=false -var-file=prod.tfvars -out=tfplan -no-color | tee plan_output.txt
+          set -euo pipefail
+          # prod.tfvars (versionado) solo trae placeholders. -var-file en la
+          # línea de comandos tiene MÁS prioridad que las variables de
+          # entorno TF_VAR_*, así que un TF_VAR_* nunca podría sobrescribir
+          # lo que ya viene de -var-file=prod.tfvars: hace falta un segundo
+          # -var-file generado en el runner, igual que local.tfvars en local.
+          jq -n \
+            --arg tenant_id "$TENANT_ID" \
+            --arg subscription_id "$SUBSCRIPTION_ID" \
+            --arg hub_vnet_id "$HUB_VNET_ID" \
+            --arg aad_admin_object_id "$AAD_ADMIN_OBJECT_ID" \
+            --arg deployer_principal_id "$DEPLOYER_PRINCIPAL_ID" \
+            --arg alert_email "$ALERT_EMAIL" \
+            --arg apim_publisher_email "$APIM_PUBLISHER_EMAIL" \
+            '{tenant_id:$tenant_id, subscription_id:$subscription_id, hub_vnet_id:$hub_vnet_id, aad_admin_object_id:$aad_admin_object_id, deployer_principal_id:$deployer_principal_id, alert_email:$alert_email, apim_publisher_email:$apim_publisher_email}' \
+            > ci.tfvars.json
+
+          terraform plan -input=false -var-file=prod.tfvars -var-file=ci.tfvars.json -out=tfplan -no-color | tee plan_output.txt
           {
             echo "### Terraform plan — prod (release ${{ github.event.release.tag_name }})"
             echo '```'
@@ -63,13 +80,13 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
         env:
-          TF_VAR_tenant_id: ${{ secrets.TF_VAR_TENANT_ID }}
-          TF_VAR_subscription_id: ${{ secrets.TF_VAR_SUBSCRIPTION_ID }}
-          TF_VAR_hub_vnet_id: ${{ secrets.TF_VAR_HUB_VNET_ID }}
-          TF_VAR_aad_admin_object_id: ${{ secrets.TF_VAR_AAD_ADMIN_OBJECT_ID }}
-          TF_VAR_deployer_principal_id: ${{ secrets.TF_VAR_DEPLOYER_PRINCIPAL_ID }}
-          TF_VAR_alert_email: ${{ secrets.TF_VAR_ALERT_EMAIL }}
-          TF_VAR_apim_publisher_email: ${{ secrets.TF_VAR_APIM_PUBLISHER_EMAIL }}
+          TENANT_ID: ${{ secrets.TF_VAR_TENANT_ID }}
+          SUBSCRIPTION_ID: ${{ secrets.TF_VAR_SUBSCRIPTION_ID }}
+          HUB_VNET_ID: ${{ secrets.TF_VAR_HUB_VNET_ID }}
+          AAD_ADMIN_OBJECT_ID: ${{ secrets.TF_VAR_AAD_ADMIN_OBJECT_ID }}
+          DEPLOYER_PRINCIPAL_ID: ${{ secrets.TF_VAR_DEPLOYER_PRINCIPAL_ID }}
+          ALERT_EMAIL: ${{ secrets.TF_VAR_ALERT_EMAIL }}
+          APIM_PUBLISHER_EMAIL: ${{ secrets.TF_VAR_APIM_PUBLISHER_EMAIL }}
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

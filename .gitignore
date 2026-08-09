@@ -29,3 +29,9 @@ override.tf.json
 
 # Archivo de plan binario, puede contener valores sensibles resueltos.
 *.tfplan
+
+# Overlay de variables sensibles que el pipeline de CI/CD genera en
+# tiempo de ejecución desde GitHub Secrets (mismo patrón que
+# local.tfvars, pero efímero en el runner) — nunca versionado.
+ci.tfvars.json
+plan_output.txt
