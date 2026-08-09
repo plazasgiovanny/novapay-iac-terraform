@@ -19,7 +19,7 @@ variable "integracion_subnet_id" {
 }
 
 variable "max_instance_count" {
-  description = "Techo de instancias del Function App, reconciliado contra el límite real de concurrent workers de la Azure SQL Database reutilizada (documento de diseño, sección 8). Distinto por ambiente porque el SKU de SQL también lo es — sin default deliberado, para forzar una decisión explícita por ambiente en dev.tfvars/prod.tfvars."
+  description = "Techo de instancias del Function App, reconciliado contra el límite real de concurrent workers de la Azure SQL Database reutilizada. Distinto por ambiente porque el SKU de SQL también lo es — sin default deliberado, para forzar una decisión explícita por ambiente en dev.tfvars/prod.tfvars."
   type        = number
 }
 

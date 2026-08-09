@@ -4,6 +4,6 @@ output "key_vault_id" {
 }
 
 output "vault_uri" {
-  description = "URI del Key Vault. La aplicación referencia secretos por esta URI, nunca por valor literal (sección 4.5)."
+  description = "URI del Key Vault. La aplicación referencia secretos por esta URI, nunca por valor literal."
   value       = azurerm_key_vault.this.vault_uri
 }

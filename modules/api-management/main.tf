@@ -1,9 +1,7 @@
 # Módulo: api-management
-# API Gateway del flujo de confirmación y notificación de pagos
-# (documento de diseño, sección 2 — "Correspondencia con el API
-# Gateway o equivalente"). Único punto de entrada real de esta
-# superficie mientras Azure Front Door no esté provisionado como
-# código (brecha heredada de la Entrega 1, sección 9).
+# API Gateway del flujo de confirmación y notificación de pagos.
+# Único punto de entrada real de esta superficie mientras Azure
+# Front Door no esté provisionado como código.
 
 resource "azurerm_api_management" "this" {
   name                = "apim-novapay-${var.environment}"
@@ -13,8 +11,8 @@ resource "azurerm_api_management" "this" {
   publisher_email     = var.publisher_email
 
   # Consumption: sin costo base, sin integración VNet (limitación
-  # aceptada y documentada en sección 9 — mitigada con function key +
-  # restricción de IP a los rangos de salida de APIM Consumption).
+  # aceptada, mitigada con function key + restricción de IP a los
+  # rangos de salida de APIM Consumption).
   sku_name = "Consumption_0"
 
   tags = var.tags
@@ -45,10 +43,9 @@ resource "azurerm_api_management_api_operation" "confirmaciones" {
 }
 
 # La function key es un secreto real, pero vive únicamente como named
-# value cifrado dentro de APIM — nunca en Key Vault, en un .tfvars, ni
-# en el código de Johan (documento de diseño, sección 7). depends_on
-# explícito: el data source solo puede resolver la clave después de
-# que el Function App exista.
+# value cifrado dentro de APIM — nunca en Key Vault ni en un .tfvars.
+# depends_on explícito: el data source solo puede resolver la clave
+# después de que el Function App exista.
 data "azurerm_function_app_host_keys" "pagos" {
   name                = var.function_app_name
   resource_group_name = var.resource_group_name
@@ -79,9 +76,8 @@ resource "azurerm_api_management_backend" "func" {
 }
 
 # Política de la operación: enruta al backend real y aplica rate
-# limiting / cuota por subscription key (protección ante abuso,
-# documento de diseño, sección 7 — "conceptual", sin prueba de carga
-# real en esta entrega).
+# limiting / cuota por subscription key (protección ante abuso). Sin
+# prueba de carga real todavía.
 resource "azurerm_api_management_api_policy" "confirmaciones" {
   api_name            = azurerm_api_management_api.pagos.name
   api_management_name = azurerm_api_management.this.name
@@ -125,13 +121,12 @@ resource "azurerm_api_management_product_api" "pagos" {
   resource_group_name = var.resource_group_name
 }
 
-# Suscripción lista de antemano: evita improvisar una subscription key
-# en vivo durante la grabación del video de evidencia (Fase 5, plan
-# de grabación descrito en el documento de diseño, sección 9).
+# Suscripción por defecto, lista de antemano en vez de generarse
+# manualmente por fuera de Terraform.
 resource "azurerm_api_management_subscription" "default" {
   api_management_name = azurerm_api_management.this.name
   resource_group_name = var.resource_group_name
   product_id          = azurerm_api_management_product.pagos.id
-  display_name        = "novapay-pagos-evidencia-${var.environment}"
+  display_name        = "novapay-pagos-default-${var.environment}"
   state               = "active"
 }

@@ -1,6 +1,6 @@
 # Composición raíz del ambiente prod. Instancia los mismos módulos que
 # dev (envs/dev/main.tf), con SKU de mayor capacidad y redundancia
-# zonal habilitada para sostener el SLA >= 99.95% (sección 3.4).
+# zonal habilitada para sostener el SLA >= 99.95%.
 
 # Etiquetas obligatorias: ningún módulo puede omitirlas porque se
 # inyectan de forma centralizada. "policies/require-tags.json"
@@ -56,16 +56,11 @@ module "security_keyvault" {
   tags                = local.common_tags
 }
 
-# --- Capa 3, adelantada: observability se declara aquí (no al final del
-# archivo) porque compute_serverless (capa 2, abajo) consume su salida
+# Capa 3, adelantada: observability se declara aquí (no al final del
+# archivo) porque compute_serverless, más abajo, consume su salida
 # appinsights_connection_string. Terraform resuelve por grafo de
-# dependencias, no por orden textual del archivo, así que esto no
-# reintroduce una capa 3 que dependa "hacia abajo" de la capa 2 en el
-# sentido conceptual: monitored_resource_ids sigue recibiendo, no
-# generando, los IDs de las capas 1 y 2 (incluida compute_serverless,
-# declarada más abajo) — es la misma relación transversal de siempre,
-# solo que Application Insights nace antes en el grafo real porque
-# alguien de la capa 2 la necesita como entrada.
+# dependencias, no por orden textual del archivo: monitored_resource_ids
+# sigue recibiendo, no generando, los IDs de las demás capas.
 module "observability" {
   source = "../../modules/observability"
 
@@ -125,9 +120,8 @@ module "compute_appservice" {
 # Asignaciones de rol que cruzan capa 1 y capa 2: viven en la raíz
 # para no introducir una dependencia circular entre security-keyvault
 # y compute-appservice (ver nota en modules/security-keyvault/main.tf).
-# Materializan el principio de mínimo privilegio de la sección 4.3:
-# cada identidad recibe únicamente el rol que necesita, sobre el
-# alcance mínimo (el vault, no la suscripción completa).
+# Mínimo privilegio: cada identidad recibe únicamente el rol que
+# necesita, sobre el alcance mínimo (el vault, no la suscripción completa).
 resource "azurerm_role_assignment" "api_kv_secrets_user" {
   scope                = module.security_keyvault.key_vault_id
   role_definition_name = "Key Vault Secrets User"
@@ -140,7 +134,7 @@ resource "azurerm_role_assignment" "functions_kv_secrets_user" {
   principal_id         = module.compute_appservice.functions_principal_id
 }
 
-# --- Capa 2, continuación: flujo serverless (Entrega 2) ---
+# --- Capa 2, continuación: flujo serverless de confirmación de pagos ---
 
 module "messaging_servicebus" {
   source = "../../modules/messaging-servicebus"
@@ -180,9 +174,9 @@ module "api_management" {
 }
 
 # Identidad compartida por ValidatePayment y ProcessPayment (un único
-# Function App = una única identidad SystemAssigned — documento de
-# diseño de la Entrega 2, sección 5): recibe ambos roles de Service
-# Bus, acotados a la cola específica, no al namespace completo.
+# Function App = una única identidad SystemAssigned): recibe ambos
+# roles de Service Bus, acotados a la cola específica, no al namespace
+# completo.
 resource "azurerm_role_assignment" "func_pagos_sb_sender" {
   scope                = module.messaging_servicebus.queue_id
   role_definition_name = "Azure Service Bus Data Sender"

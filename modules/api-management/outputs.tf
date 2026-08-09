@@ -4,12 +4,12 @@ output "id" {
 }
 
 output "gateway_url" {
-  description = "URL pública del gateway de APIM — punto de entrada real de esta superficie mientras Azure Front Door no esté provisionado (documento de diseño, sección 2)."
+  description = "URL pública del gateway de APIM — punto de entrada real de esta superficie mientras Azure Front Door no esté provisionado."
   value       = azurerm_api_management.this.gateway_url
 }
 
 output "subscription_primary_key" {
-  description = "Subscription key lista para el video de evidencia funcional (Fase 5) — enviada como header Ocp-Apim-Subscription-Key."
+  description = "Subscription key de la suscripción por defecto — enviada como header Ocp-Apim-Subscription-Key."
   value       = azurerm_api_management_subscription.default.primary_key
   sensitive   = true
 }

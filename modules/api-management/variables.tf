@@ -39,7 +39,7 @@ variable "function_default_hostname" {
 }
 
 variable "rate_limit_calls_per_minute" {
-  description = "Límite de llamadas por minuto por subscription key (protección ante abuso, documento de diseño sección 7)."
+  description = "Límite de llamadas por minuto por subscription key (protección ante abuso)."
   type        = number
   default     = 60
 }

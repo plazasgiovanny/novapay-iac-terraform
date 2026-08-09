@@ -19,17 +19,17 @@ variable "data_subnet_id" {
 }
 
 variable "sku_name" {
-  description = "SKU de Azure SQL Database. GP_Gen5_2 en dev, BC_Gen5_4 (Business Critical, zone-redundant) en prod (sección 3.4)."
+  description = "SKU de Azure SQL Database. GP_Gen5_2 en dev, BC_Gen5_4 (Business Critical, zone-redundant) en prod."
   type        = string
 }
 
 variable "zone_redundant" {
-  description = "Redundancia zonal. false en dev, true en prod para sostener el SLA >= 99.95% (sección 1.5)."
+  description = "Redundancia zonal. false en dev, true en prod para sostener el SLA >= 99.95%."
   type        = bool
 }
 
 variable "aad_admin_login" {
-  description = "Nombre del grupo o identidad de Microsoft Entra ID designado como administrador de Azure SQL. Reemplaza la autenticación SQL con usuario/contraseña por defecto (sección 4.5)."
+  description = "Nombre del grupo o identidad de Microsoft Entra ID designado como administrador de Azure SQL. Reemplaza la autenticación SQL con usuario/contraseña por defecto."
   type        = string
 }
 

@@ -1,7 +1,7 @@
 # Declaración de variables de la composición raíz. Los valores reales
-# se asignan por ambiente en dev.tfvars / prod.tfvars (sección 3.4);
-# este archivo es idéntico en envs/dev y envs/prod porque ambos
-# instancian los mismos módulos con distintos parámetros.
+# se asignan por ambiente en dev.tfvars / prod.tfvars; este archivo es
+# idéntico en envs/dev y envs/prod porque ambos instancian los mismos
+# módulos con distintos parámetros.
 
 variable "environment" {
   description = "Nombre del ambiente."
@@ -35,7 +35,7 @@ variable "vnet_cidr" {
 }
 
 variable "subnets" {
-  description = "Mapa de subredes (aplicación, integración, datos, pública) con su CIDR, reglas permitidas y delegación opcional (Entrega 2: integracion se delega a Microsoft.Web/serverFarms)."
+  description = "Mapa de subredes (aplicación, integración, datos, pública) con su CIDR, reglas permitidas y delegación opcional (integracion se delega a Microsoft.Web/serverFarms)."
   type = map(object({
     cidr = string
     allowed_rules = list(object({
@@ -88,7 +88,7 @@ variable "appservice_autoscale_min" {
 }
 
 variable "appservice_autoscale_max" {
-  description = "Instancias máximas del perfil de autoescalado (techo del rango 5-8x de la sección 1.5)."
+  description = "Instancias máximas del perfil de autoescalado (techo del rango 5-8x el promedio ante picos de tráfico)."
   type        = number
 }
 
@@ -102,7 +102,7 @@ variable "alert_email" {
   type        = string
 }
 
-# --- Variables nuevas de la Entrega 2 (flujo serverless) ---
+# --- Variables del flujo serverless ---
 
 variable "apim_publisher_name" {
   description = "Nombre del publicador de la instancia de APIM (requerido por Azure)."
@@ -115,7 +115,7 @@ variable "apim_publisher_email" {
 }
 
 variable "serverless_max_instance_count" {
-  description = "Techo de instancias del Function App serverless, reconciliado contra el límite real de concurrent workers de Azure SQL (documento de diseño de la Entrega 2, sección 8: 200 workers en dev/GP_Gen5_2, 400 en prod/BC_Gen5_4). Distinto por ambiente, sin default deliberado."
+  description = "Techo de instancias del Function App serverless, reconciliado contra el límite real de concurrent workers de Azure SQL (200 workers en dev/GP_Gen5_2, 400 en prod/BC_Gen5_4). Distinto por ambiente, sin default deliberado."
   type        = number
 }
 

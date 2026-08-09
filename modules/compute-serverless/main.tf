@@ -1,27 +1,20 @@
 # Módulo: compute-serverless
 # Function App dedicado al flujo de confirmación y notificación de
-# pagos (Entrega 2, documento de diseño sección 1 y 4). Deliberadamente
-# separado del Service Plan Dedicated de compute-appservice.
+# pagos. Deliberadamente separado del Service Plan Dedicated de
+# compute-appservice.
 #
-# Historial de esta decisión (documentado también en el documento de
-# diseño, sección 1 y 9): la primera versión de este módulo usaba el
-# plan de Consumo clásico (Y1, azurerm_linux_function_app). Se descubrió
-# al pasar a código que Y1 NO soporta integración VNet regional bajo
-# ninguna circunstancia (no es un límite "según la región" como se
-# pensó inicialmente) — y este Function App SÍ necesita esa integración
-# para llegar a Azure SQL, que solo expone un Private Endpoint en la
-# subred "datos" (acceso público deshabilitado desde la Entrega 1). La
-# alternativa Elastic Premium (EP1) sí soporta VNet integration, pero
-# mantiene como mínimo una instancia siempre activa — pierde el
-# escalado real a cero que motivó elegir un plan serverless en primer
-# lugar. Se optó por **Flex Consumption (FC1)**: soporta integración
-# VNet regional de forma nativa Y sigue escalando a cero por defecto
-# ("Always Ready" = 0 instancias si no se configura lo contrario),
-# preservando intacto el argumento de cold start real de la sección 1.
-# El costo de esta decisión es un salto de versión mayor del provider
-# azurerm (~> 3.110 -> ~> 4.21, ver envs/*/versions.tf), porque el
-# recurso azurerm_function_app_flex_consumption solo existe desde la
-# versión 4.21 del provider.
+# Plan Flex Consumption (FC1), no Y1 ni EP1: Azure SQL solo expone
+# Private Endpoint (acceso público deshabilitado), así que este
+# Function App necesita integración VNet regional. El plan de Consumo
+# clásico (Y1) no la soporta bajo ninguna circunstancia — no es un
+# límite por región, es una restricción estructural del SKU. Elastic
+# Premium (EP1) sí la soporta, pero mantiene como mínimo una instancia
+# siempre activa, perdiendo el escalado real a cero. FC1 soporta
+# integración VNet regional de forma nativa y sigue escalando a cero
+# por defecto ("Always Ready" = 0 instancias salvo configuración
+# explícita). Costo de la decisión: requiere provider azurerm >= 4.21
+# (ver envs/*/versions.tf), ya que azurerm_function_app_flex_consumption
+# no existe en versiones anteriores.
 
 resource "azurerm_service_plan" "this" {
   name                = "asp-novapay-serverless-${var.environment}"
@@ -61,8 +54,7 @@ resource "azurerm_function_app_flex_consumption" "this" {
   service_plan_id     = azurerm_service_plan.this.id
 
   # Autenticación al contenedor de despliegue por identidad
-  # administrada, no por cadena de conexión con clave — continúa la
-  # jerarquía "eliminar el secreto" (documento de diseño, sección 7).
+  # administrada, no por cadena de conexión con clave.
   storage_container_type      = "blobContainer"
   storage_container_endpoint  = "${azurerm_storage_account.this.primary_blob_endpoint}${azurerm_storage_container.deployments.name}"
   storage_authentication_type = "SystemAssignedIdentity"
@@ -70,20 +62,18 @@ resource "azurerm_function_app_flex_consumption" "this" {
   runtime_name    = "dotnet-isolated"
   runtime_version = "8.0"
 
-  # Techo de instancias reconciliado contra el límite REAL de Azure SQL
+  # Techo de instancias reconciliado contra el límite real de Azure SQL
   # (100 concurrent workers por vCore en Gen5 — Microsoft Learn), no un
   # número arbitrario: reserva como máximo ~15% del presupuesto total
-  # de workers de la base de datos reutilizada para este flujo nuevo,
-  # dejando el resto para el App Service transaccional existente
-  # (documento de diseño, sección 8, con la cuenta completa mostrada).
-  # Distinto por ambiente porque el SKU de Azure SQL también lo es
-  # (GP_Gen5_2 en dev = 200 workers; BC_Gen5_4 en prod = 400).
+  # de workers de la base de datos para este flujo, dejando el resto
+  # para el App Service transaccional existente. Distinto por ambiente
+  # porque el SKU de Azure SQL también lo es (GP_Gen5_2 en dev = 200
+  # workers; BC_Gen5_4 en prod = 400).
   maximum_instance_count = var.max_instance_count
   instance_memory_in_mb  = 2048
 
   # Deliberadamente SIN bloque "always_ready": el default (0 instancias
-  # precalentadas) es lo que preserva el cold start real que motivó
-  # elegir un plan serverless en la sección 1 del documento de diseño.
+  # precalentadas) es lo que preserva el escalado real a cero.
 
   # Integración VNet regional hacia la subred integracion, delegada a
   # Microsoft.Web/serverFarms (módulo networking) — a diferencia del
@@ -92,10 +82,10 @@ resource "azurerm_function_app_flex_consumption" "this" {
   virtual_network_subnet_id = var.integracion_subnet_id
 
   # Identidad SystemAssigned única, compartida por las dos funciones
-  # que aloja este recurso (ValidatePayment, ProcessPayment). Azure Functions
-  # no tiene identidad a nivel de función individual — ver documento de
-  # diseño, sección 5. También es la identidad que autentica contra el
-  # contenedor de despliegue (storage_authentication_type de arriba).
+  # que aloja este recurso (ValidatePayment, ProcessPayment). Azure
+  # Functions no tiene identidad a nivel de función individual.
+  # También es la identidad que autentica contra el contenedor de
+  # despliegue (storage_authentication_type de arriba).
   identity {
     type = "SystemAssigned"
   }
@@ -109,14 +99,14 @@ resource "azurerm_function_app_flex_consumption" "this" {
 
     # Conexión a Service Bus por identidad administrada: solo el FQDN
     # del namespace viaja en configuración, nunca una cadena de
-    # conexión con clave compartida (documento de diseño, sección 7).
+    # conexión con clave compartida.
     serviceBusConnection__fullyQualifiedNamespace = var.servicebus_namespace_fqdn
     serviceBusConnection__credential              = "managedidentity"
   }
 
   tags = var.tags
 
-  # Nota de despliegue (Fase 5): con storage_authentication_type =
+  # Nota de despliegue: con storage_authentication_type =
   # "SystemAssignedIdentity", el propio Function App necesita el rol
   # de abajo (storage_access) para poder leer su paquete de despliegue.
   # Si el primer "apply" falla porque el rol aún no propagó cuando

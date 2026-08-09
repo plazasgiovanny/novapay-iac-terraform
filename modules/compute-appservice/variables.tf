@@ -19,7 +19,7 @@ variable "app_subnet_id" {
 }
 
 variable "sku_name" {
-  description = "SKU del App Service Plan. Difiere entre dev y prod (sección 3.4)."
+  description = "SKU del App Service Plan. Difiere entre dev y prod."
   type        = string
 }
 
@@ -34,12 +34,12 @@ variable "autoscale_min_count" {
 }
 
 variable "autoscale_max_count" {
-  description = "Instancias máximas del perfil de autoescalado. Fija el techo del rango 5-8x exigido en la sección 1.5 (requerimiento no funcional de escalabilidad)."
+  description = "Instancias máximas del perfil de autoescalado. Fija el techo del rango 5-8x el promedio, para absorber picos de tráfico."
   type        = number
 }
 
 variable "key_vault_uri" {
-  description = "URI del Key Vault desde donde la aplicación resuelve sus secretos en tiempo de ejecución (sección 4.5)."
+  description = "URI del Key Vault desde donde la aplicación resuelve sus secretos en tiempo de ejecución."
   type        = string
 }
 

@@ -1,7 +1,7 @@
 # Módulo: networking
 # Aprovisiona la VNet spoke de NovaPay, sus subredes y el NSG de cada
 # una en modo "deny-by-default": solo se permite explícitamente el
-# tráfico declarado en var.subnets[*].allowed_rules (sección 4.4).
+# tráfico declarado en var.subnets[*].allowed_rules.
 
 resource "azurerm_virtual_network" "spoke" {
   name                = "vnet-novapay-spoke-${var.environment}"
@@ -12,8 +12,8 @@ resource "azurerm_virtual_network" "spoke" {
 }
 
 # El mapa de subredes es el contrato de entrada del módulo: quien lo
-# consume decide cuántas subredes crear y con qué propósito, sin tocar
-# la lógica interna (principio de contrato, sección 3.3).
+# consume decide cuántas subredes crear y con qué propósito, sin
+# tocar la lógica interna.
 resource "azurerm_subnet" "this" {
   for_each             = var.subnets
   name                 = "snet-${each.key}-${var.environment}"
@@ -23,8 +23,7 @@ resource "azurerm_subnet" "this" {
 
   # Delegación opcional: convierte la subred en exclusiva para el
   # servicio delegado (p. ej. Microsoft.Web/serverFarms, requerido por
-  # la integración VNet regional de un plan de Consumo de Functions).
-  # Ninguna subred la usaba hasta la Entrega 2 (sección 3.3.2).
+  # la integración VNet regional de un Function App).
   dynamic "delegation" {
     for_each = each.value.delegation != null ? [each.value.delegation] : []
     content {
@@ -71,8 +70,7 @@ resource "azurerm_subnet_network_security_group_association" "this" {
 
 # Peering hacia la VNet hub: habilita el acceso administrativo vía
 # Azure Bastion y la inspección de tráfico norte-sur por Azure
-# Firewall descritos en la sección 2.1, sin exponer la spoke
-# directamente a Internet.
+# Firewall, sin exponer la spoke directamente a Internet.
 resource "azurerm_virtual_network_peering" "spoke_to_hub" {
   name                      = "peer-spoke-to-hub-${var.environment}"
   resource_group_name       = var.resource_group_name
