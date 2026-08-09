@@ -37,8 +37,9 @@ terraform init -backend-config=backend.hcl
 # Calcula el plan de cambios contra el estado remoto.
 terraform plan -var-file=dev.tfvars   # o prod.tfvars
 
-# Aplica los cambios (en la práctica, solo desde el pipeline de CI,
-# nunca desde un equipo local).
+# Aplica los cambios. En prod, el "apply" real ocurre solo desde el
+# pipeline de CI/CD (ver más abajo) — este comando local es para dev
+# o para diagnosticar localmente, no para un apply real de prod.
 terraform apply -var-file=dev.tfvars
 ```
 
@@ -48,6 +49,23 @@ Verificación de idempotencia:
 terraform plan -var-file=dev.tfvars -detailed-exitcode
 # 0 = sin cambios pendientes · 1 = error · 2 = hay diferencias por resolver
 ```
+
+## Pipeline CI/CD
+
+`prod` se gestiona mediante dos workflows de GitHub Actions (`.github/workflows/`), ambos autenticados contra Azure vía OIDC (identidad federada, sin secretos de larga duración):
+
+- **`terraform-ci.yml`** — en cada Pull Request hacia `main`: `fmt`, `validate` y `plan` (de solo lectura). El resultado del plan se publica en el resumen del run.
+- **`terraform-cd.yml`** — al publicar un GitHub Release: calcula el plan y lo sube como artifact (`plan`, sin gate), y luego lo aplica (`apply`) bajo el Environment `production`, que exige aprobación humana manual antes de tocar Azure real. El `apply` usa exactamente el plan que el reviewer aprobó, no uno recalculado a ciegas.
+
+Validado con una ejecución real de extremo a extremo (PR → CI → merge → release → aprobación → apply) contra `prod`: `Apply complete! Resources: 0 added, 9 changed, 0 destroyed.`
+
+**Límite reconocido**: el Service Principal del pipeline necesita el rol `Resource Policy Contributor` a nivel de **suscripción completa** (no un resource group), porque `azurerm_policy_definition`/`azurerm_subscription_policy_assignment` (`envs/*/policies.tf`) actúan a ese nivel — no fue posible acotar el 100% de sus permisos a `rg-novapay-prod`.
+
+**Drift perpetuo conocido (no es un bug de este repo)**: dos atributos oscilan entre "sin cambios" y "cambio pendiente" en plans sucesivos incluso después de un `apply` exitoso, por comportamiento documentado del proveedor `azurerm`/API de Azure, no por un error de configuración:
+- `azurerm_monitor_diagnostic_setting` con `enabled_metric { category = "AllMetrics" }` sobre Azure SQL Database — Azure no siempre normaliza las categorías como Terraform espera ([issue #17172](https://github.com/hashicorp/terraform-provider-azurerm/issues/17172), [issue #29772](https://github.com/hashicorp/terraform-provider-azurerm/issues/29772) del proveedor `azurerm`).
+- `site_config.application_insights_connection_string` en el Function App serverless — el proveedor `azurerm` tiene un comportamiento documentado con los atributos de conexión a Application Insights en Function Apps ([issue #16077](https://github.com/hashicorp/terraform-provider-azurerm/issues/16077)).
+
+Mitigación futura: `lifecycle { ignore_changes = [...] }` sobre esos atributos puntuales, deliberadamente no aplicada aquí para no ocultar el estado real mientras se documenta como hallazgo.
 
 ## Notas de seguridad y gobierno
 
