@@ -54,6 +54,7 @@ module "security_keyvault" {
   tenant_id           = var.tenant_id
   data_subnet_id      = module.networking.subnet_ids["datos"]
   tags                = local.common_tags
+  name_suffix         = var.keyvault_name_suffix
 }
 
 # Capa 3, adelantada: observability se declara aquí (no al final del

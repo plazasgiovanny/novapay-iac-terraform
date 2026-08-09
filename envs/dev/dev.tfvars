@@ -25,6 +25,14 @@ subnets = {
     allowed_rules = [
       { name = "allow-from-publica", priority = 100, protocol = "Tcp", port = "443", source = "10.10.1.0/24" }
     ]
+    # HALLAZGO REAL (apply real fallido en prod): la integración VNet
+    # regional clásica de App Service/Functions (compute-appservice,
+    # no Flex Consumption) sí exige delegación a Microsoft.Web/serverFarms
+    # — "Subnet ... is missing a delegation to Microsoft.Web/serverFarms".
+    delegation = {
+      name                    = "delegation-appservice"
+      service_delegation_name = "Microsoft.Web/serverFarms"
+    }
   }
   integracion = {
     cidr = "10.10.3.0/24"
@@ -32,10 +40,16 @@ subnets = {
       { name = "allow-from-aplicacion", priority = 100, protocol = "Tcp", port = "443", source = "10.10.2.0/24" }
     ]
     # Requerida por la integración VNet regional del Function App
-    # serverless (modules/compute-serverless).
+    # serverless en Flex Consumption (modules/compute-serverless).
+    # Flex Consumption delega a Microsoft.App/environments (no
+    # Microsoft.Web/serverFarms, que es el delegado correcto solo para
+    # el modelo clásico de App Service/Functions), con action
+    # .../subnets/join/action — confirmado tras un apply real fallido
+    # por SubnetMissingRequiredDelegation en prod (ver prod.tfvars).
     delegation = {
       name                    = "delegation-serverless"
-      service_delegation_name = "Microsoft.Web/serverFarms"
+      service_delegation_name = "Microsoft.App/environments"
+      actions                 = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
     }
   }
   datos = {

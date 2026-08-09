@@ -5,7 +5,7 @@
 # auditables e independientes del recurso.
 
 resource "azurerm_key_vault" "this" {
-  name                = "kv-novapay-${var.environment}"
+  name                = "kv-novapay-${var.environment}${var.name_suffix}"
   location            = var.location
   resource_group_name = var.resource_group_name
   tenant_id           = var.tenant_id

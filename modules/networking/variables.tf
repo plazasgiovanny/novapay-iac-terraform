@@ -28,8 +28,12 @@ variable "subnets" {
     Mapa de subredes a crear. La clave es el nombre lógico de la subred
     (aplicacion, integracion, datos, publica) y el valor define su CIDR,
     las reglas de entrada explícitamente permitidas (deny-by-default), y
-    opcionalmente una delegación de servicio (p. ej. Microsoft.Web/serverFarms
-    para integración VNet regional de un plan de Consumo de Azure Functions).
+    opcionalmente una delegación de servicio. Cada tipo de servicio exige
+    un `actions` distinto (p. ej. Microsoft.Web/serverFarms usa
+    ".../subnets/action"; Microsoft.App/environments, requerido por Azure
+    Functions Flex Consumption, usa ".../subnets/join/action") — no hay
+    un valor único correcto para todos los delegados, por eso es
+    configurable por subred en vez de fijo en el módulo.
     `delegation = null` (el default) deja la subred sin delegar, igual que
     hoy — una subred delegada queda exclusiva para ese tipo de servicio.
   EOT
@@ -45,6 +49,7 @@ variable "subnets" {
     delegation = optional(object({
       name                    = string
       service_delegation_name = string
+      actions                 = optional(list(string), ["Microsoft.Network/virtualNetworks/subnets/action"])
     }))
   }))
 }

@@ -54,6 +54,7 @@ module "security_keyvault" {
   tenant_id           = var.tenant_id
   data_subnet_id      = module.networking.subnet_ids["datos"]
   tags                = local.common_tags
+  name_suffix         = var.keyvault_name_suffix
 }
 
 # Capa 3, adelantada: observability se declara aquí (no al final del
@@ -187,4 +188,16 @@ resource "azurerm_role_assignment" "func_pagos_sb_receiver" {
   scope                = module.messaging_servicebus.queue_id
   role_definition_name = "Azure Service Bus Data Receiver"
   principal_id         = module.compute_serverless.principal_id
+}
+
+# Acceso de despliegue acotado al Function App serverless, solo para
+# quien vaya a publicar el código de la función — nunca por publish
+# profile (credencial SCM de larga duración), sino por rol RBAC
+# revocable, coherente con el resto del proyecto (sin secretos
+# gestionados manualmente).
+resource "azurerm_role_assignment" "func_pagos_deployer" {
+  count                = var.deployer_principal_id != "" ? 1 : 0
+  scope                = module.compute_serverless.function_app_id
+  role_definition_name = "Website Contributor"
+  principal_id         = var.deployer_principal_id
 }

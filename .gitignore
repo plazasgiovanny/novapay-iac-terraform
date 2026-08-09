@@ -21,6 +21,7 @@ crash.*.log
 # *.tfvars versionados en este repositorio (dev.tfvars, prod.tfvars)
 # contienen únicamente placeholders ilustrativos.
 *.auto.tfvars
+local.tfvars
 override.tf
 override.tf.json
 *_override.tf

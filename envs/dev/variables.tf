@@ -48,6 +48,7 @@ variable "subnets" {
     delegation = optional(object({
       name                    = string
       service_delegation_name = string
+      actions                 = optional(list(string), ["Microsoft.Network/virtualNetworks/subnets/action"])
     }))
   }))
 }
@@ -100,6 +101,12 @@ variable "retention_in_days" {
 variable "alert_email" {
   description = "Correo del equipo SRE/DevOps para alertas."
   type        = string
+}
+
+variable "keyvault_name_suffix" {
+  description = "Sufijo opcional para el nombre del Key Vault, usado para evitar colisión con un vault soft-deleted de un despliegue anterior (ver modules/security-keyvault/variables.tf)."
+  type        = string
+  default     = ""
 }
 
 # --- Variables del flujo serverless ---

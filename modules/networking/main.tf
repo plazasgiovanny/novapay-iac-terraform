@@ -22,15 +22,16 @@ resource "azurerm_subnet" "this" {
   address_prefixes     = [each.value.cidr]
 
   # Delegación opcional: convierte la subred en exclusiva para el
-  # servicio delegado (p. ej. Microsoft.Web/serverFarms, requerido por
-  # la integración VNet regional de un Function App).
+  # servicio delegado. El action requerido depende del tipo de servicio
+  # (no es el mismo para todos), por eso viene del propio objeto de
+  # delegación en vez de fijo aquí.
   dynamic "delegation" {
     for_each = each.value.delegation != null ? [each.value.delegation] : []
     content {
       name = delegation.value.name
       service_delegation {
         name    = delegation.value.service_delegation_name
-        actions = ["Microsoft.Network/virtualNetworks/subnets/action"]
+        actions = delegation.value.actions
       }
     }
   }
