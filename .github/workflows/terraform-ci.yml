@@ -27,6 +27,17 @@ jobs:
     defaults:
       run:
         working-directory: envs/prod
+    # A nivel de job, no de step: cada invocación de "terraform" que toca el
+    # backend remoto (init, plan, apply) reautentica por separado — si estas
+    # variables solo viven en el step de "init", el resto de comandos caen a
+    # autenticación por clave de la cuenta de almacenamiento y fallan con
+    # 403 (el Service Principal solo tiene RBAC de datos, no listKeys).
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_USE_AZUREAD: "true"
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -46,12 +57,6 @@ jobs:
 
       - name: terraform init
         run: terraform init -backend-config=backend.hcl
-        env:
-          ARM_USE_OIDC: "true"
-          ARM_USE_AZUREAD: "true"
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: terraform validate
         run: terraform validate
@@ -66,10 +71,6 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
         env:
-          ARM_USE_OIDC: "true"
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           TF_VAR_tenant_id: ${{ secrets.TF_VAR_TENANT_ID }}
           TF_VAR_subscription_id: ${{ secrets.TF_VAR_SUBSCRIPTION_ID }}
           TF_VAR_hub_vnet_id: ${{ secrets.TF_VAR_HUB_VNET_ID }}
