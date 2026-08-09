@@ -1,16 +1,34 @@
 # Módulo: compute-serverless
 # Function App dedicado al flujo de confirmación y notificación de
 # pagos (Entrega 2, documento de diseño sección 1 y 4). Deliberadamente
-# separado del Service Plan Dedicated de compute-appservice: corre en
-# plan de Consumo (o Elastic Premium si la región lo exige), único
-# cómputo del repositorio que escala a cero y exhibe cold start real.
+# separado del Service Plan Dedicated de compute-appservice.
+#
+# Historial de esta decisión (documentado también en el documento de
+# diseño, sección 1 y 9): la primera versión de este módulo usaba el
+# plan de Consumo clásico (Y1, azurerm_linux_function_app). Se descubrió
+# al pasar a código que Y1 NO soporta integración VNet regional bajo
+# ninguna circunstancia (no es un límite "según la región" como se
+# pensó inicialmente) — y este Function App SÍ necesita esa integración
+# para llegar a Azure SQL, que solo expone un Private Endpoint en la
+# subred "datos" (acceso público deshabilitado desde la Entrega 1). La
+# alternativa Elastic Premium (EP1) sí soporta VNet integration, pero
+# mantiene como mínimo una instancia siempre activa — pierde el
+# escalado real a cero que motivó elegir un plan serverless en primer
+# lugar. Se optó por **Flex Consumption (FC1)**: soporta integración
+# VNet regional de forma nativa Y sigue escalando a cero por defecto
+# ("Always Ready" = 0 instancias si no se configura lo contrario),
+# preservando intacto el argumento de cold start real de la sección 1.
+# El costo de esta decisión es un salto de versión mayor del provider
+# azurerm (~> 3.110 -> ~> 4.21, ver envs/*/versions.tf), porque el
+# recurso azurerm_function_app_flex_consumption solo existe desde la
+# versión 4.21 del provider.
 
 resource "azurerm_service_plan" "this" {
   name                = "asp-novapay-serverless-${var.environment}"
   location            = var.location
   resource_group_name = var.resource_group_name
   os_type             = "Linux"
-  sku_name            = var.function_plan_sku
+  sku_name            = "FC1"
   tags                = var.tags
 }
 
@@ -27,35 +45,58 @@ resource "azurerm_storage_account" "this" {
   tags                     = var.tags
 }
 
-resource "azurerm_linux_function_app" "this" {
+# Flex Consumption exige un contenedor blob explícito para el paquete
+# de despliegue (no basta con "una cuenta de almacenamiento" como en
+# el modelo clásico de azurerm_linux_function_app).
+resource "azurerm_storage_container" "deployments" {
+  name                  = "func-novapay-pagos-deployments"
+  storage_account_id    = azurerm_storage_account.this.id
+  container_access_type = "private"
+}
+
+resource "azurerm_function_app_flex_consumption" "this" {
   name                = "func-novapay-pagos-${var.environment}"
   location            = var.location
   resource_group_name = var.resource_group_name
   service_plan_id     = azurerm_service_plan.this.id
 
-  storage_account_name          = azurerm_storage_account.this.name
-  storage_uses_managed_identity = true
+  # Autenticación al contenedor de despliegue por identidad
+  # administrada, no por cadena de conexión con clave — continúa la
+  # jerarquía "eliminar el secreto" (documento de diseño, sección 7).
+  storage_container_type      = "blobContainer"
+  storage_container_endpoint  = "${azurerm_storage_account.this.primary_blob_endpoint}${azurerm_storage_container.deployments.name}"
+  storage_authentication_type = "SystemAssignedIdentity"
+
+  runtime_name    = "dotnet-isolated"
+  runtime_version = "8.0"
+
+  # Instancias y memoria: valores de partida razonables para el
+  # volumen de prueba de esta entrega, no una proyección de carga real
+  # (documento de diseño, sección 8). Ajustar en la Fase 5 si la
+  # evidencia real de carga lo justifica.
+  maximum_instance_count = 40
+  instance_memory_in_mb  = 2048
+
+  # Deliberadamente SIN bloque "always_ready": el default (0 instancias
+  # precalentadas) es lo que preserva el cold start real que motivó
+  # elegir un plan serverless en la sección 1 del documento de diseño.
 
   # Integración VNet regional hacia la subred integracion, delegada a
-  # Microsoft.Web/serverFarms (módulo networking) — requisito del plan
-  # de Consumo/Elastic Premium en Linux, a diferencia del Dedicated de
-  # compute-appservice, que no requiere delegación explícita.
+  # Microsoft.Web/serverFarms (módulo networking) — a diferencia del
+  # plan de Consumo clásico (Y1), Flex Consumption sí la soporta de
+  # forma nativa.
   virtual_network_subnet_id = var.integracion_subnet_id
 
   # Identidad SystemAssigned única, compartida por las dos funciones
   # que aloja este recurso (ValidarPago, ProcesarPago). Azure Functions
   # no tiene identidad a nivel de función individual — ver documento de
-  # diseño, sección 5.
+  # diseño, sección 5. También es la identidad que autentica contra el
+  # contenedor de despliegue (storage_authentication_type de arriba).
   identity {
     type = "SystemAssigned"
   }
 
-  site_config {
-    application_stack {
-      dotnet_version              = "8.0"
-      use_dotnet_isolated_runtime = true
-    }
-  }
+  site_config {}
 
   app_settings = {
     # Application Insights por connection string (no instrumentation
@@ -70,13 +111,22 @@ resource "azurerm_linux_function_app" "this" {
   }
 
   tags = var.tags
+
+  # Nota de despliegue (Fase 5): con storage_authentication_type =
+  # "SystemAssignedIdentity", el propio Function App necesita el rol
+  # de abajo (storage_access) para poder leer su paquete de despliegue.
+  # Si el primer "apply" falla porque el rol aún no propagó cuando
+  # Azure intenta validar el acceso, un segundo "apply" lo resuelve —
+  # mismo tipo de riesgo de orden ya documentado para el data source
+  # de host keys en modules/api-management.
 }
 
 # Permiso mínimo sobre su propia cuenta de almacenamiento, mismo
 # patrón que functions_storage_access en compute-appservice — sin
-# distribuir la clave de acceso compartida de la cuenta.
+# distribuir la clave de acceso compartida de la cuenta. Cubre tanto
+# el contenedor de despliegue como cualquier otro blob de runtime.
 resource "azurerm_role_assignment" "storage_access" {
   scope                = azurerm_storage_account.this.id
   role_definition_name = "Storage Blob Data Owner"
-  principal_id         = azurerm_linux_function_app.this.identity[0].principal_id
+  principal_id         = azurerm_function_app_flex_consumption.this.identity[0].principal_id
 }

@@ -19,6 +19,11 @@ variable "tenant_id" {
   type        = string
 }
 
+variable "subscription_id" {
+  description = "ID de la suscripción de Azure. Obligatorio para el provider desde azurerm 4.x (antes se inferían solo del contexto de Azure CLI)."
+  type        = string
+}
+
 variable "hub_vnet_id" {
   description = "ID de la VNet hub compartida, gestionada fuera de este repositorio (plataforma central de conectividad)."
   type        = string
@@ -109,8 +114,3 @@ variable "apim_publisher_email" {
   type        = string
 }
 
-variable "function_plan_sku" {
-  description = "SKU del Service Plan del Function App serverless. Y1 = Consumo (default). EP1 = Elastic Premium, si la región no soporta integración VNet regional en Consumo Linux (documento de diseño de la Entrega 2, sección 9)."
-  type        = string
-  default     = "Y1"
-}

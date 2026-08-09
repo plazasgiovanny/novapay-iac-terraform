@@ -14,7 +14,7 @@ resource "azurerm_key_vault" "this" {
   # RBAC en vez de access policies: cada concesión de acceso queda
   # como una asignación de rol de Azure, versionable y auditable
   # desde el mismo plano de control de IAM (sección 4.2).
-  enable_rbac_authorization = true
+  rbac_authorization_enabled = true
 
   # La eliminación definitiva requiere una acción explícita adicional:
   # evita que un "destroy" accidental borre secretos de forma

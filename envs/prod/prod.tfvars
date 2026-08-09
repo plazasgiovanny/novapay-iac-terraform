@@ -7,8 +7,9 @@
 environment = "prod"
 location    = "eastus2"
 
-tenant_id   = "00000000-0000-0000-0000-000000000000"
-hub_vnet_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-novapay-hub/providers/Microsoft.Network/virtualNetworks/vnet-novapay-hub"
+tenant_id       = "00000000-0000-0000-0000-000000000000"
+subscription_id = "00000000-0000-0000-0000-000000000000"
+hub_vnet_id     = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-novapay-hub/providers/Microsoft.Network/virtualNetworks/vnet-novapay-hub"
 
 vnet_cidr = "10.20.0.0/16"
 
@@ -66,11 +67,8 @@ appservice_autoscale_max = 24
 retention_in_days = 1826
 alert_email       = "sre-novapay@example.com"
 
-# Flujo serverless (Entrega 2). function_plan_sku se deja en Y1 por
-# defecto; se evalúa EP1 en la Fase 5 solo si la región elegida no
-# soporta integración VNet regional en Consumo Linux (documento de
-# diseño de la Entrega 2, sección 9) o si se requiere el SLA/aislamiento
-# adicional de un plan siempre activo.
+# Flujo serverless (Entrega 2). El Function App usa Flex Consumption
+# (FC1, hardcodeado en modules/compute-serverless) — no requiere
+# variable de SKU aquí; ver documento de diseño, sección 1 y 9.
 apim_publisher_name  = "NovaPay - Plataforma"
 apim_publisher_email = "sre-novapay@example.com"
-function_plan_sku    = "Y1"

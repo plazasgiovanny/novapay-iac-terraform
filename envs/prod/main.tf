@@ -158,7 +158,6 @@ module "compute_serverless" {
   location                      = var.location
   resource_group_name           = azurerm_resource_group.this.name
   integracion_subnet_id         = module.networking.subnet_ids["integracion"]
-  function_plan_sku             = var.function_plan_sku
   servicebus_namespace_fqdn     = module.messaging_servicebus.namespace_fqdn
   appinsights_connection_string = module.observability.appinsights_connection_string
   tags                          = local.common_tags
