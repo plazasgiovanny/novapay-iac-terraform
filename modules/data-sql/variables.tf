@@ -18,6 +18,11 @@ variable "data_subnet_id" {
   type        = string
 }
 
+variable "virtual_network_id" {
+  description = "ID de la VNet spoke, para enlazar la zona DNS privada del private endpoint (contrato recibido del módulo networking)."
+  type        = string
+}
+
 variable "sku_name" {
   description = "SKU de Azure SQL Database. GP_Gen5_2 en dev, BC_Gen5_4 (Business Critical, zone-redundant) en prod."
   type        = string

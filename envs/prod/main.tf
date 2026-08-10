@@ -93,6 +93,7 @@ module "data_sql" {
   location            = var.location
   resource_group_name = azurerm_resource_group.this.name
   data_subnet_id      = module.networking.subnet_ids["datos"]
+  virtual_network_id  = module.networking.vnet_id
   sku_name            = var.sql_sku_name
   zone_redundant      = var.sql_zone_redundant
   aad_admin_login     = var.aad_admin_login

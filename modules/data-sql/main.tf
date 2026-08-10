@@ -56,7 +56,32 @@ resource "azurerm_private_endpoint" "sql" {
     is_manual_connection           = false
   }
 
+  # Sin esto, el FQDN público del servidor (<server>.database.windows.net)
+  # nunca resuelve a la IP del private endpoint: cualquier cliente dentro
+  # de la VNet -incluida la identidad administrada del Function App-
+  # seguiría resolviendo la IP pública del gateway de Azure SQL y la
+  # conexión se caería igual, porque el servidor tiene
+  # public_network_access_enabled = false.
+  private_dns_zone_group {
+    name                 = "sql-dns-zone-group"
+    private_dns_zone_ids = [azurerm_private_dns_zone.sql.id]
+  }
+
   tags = var.tags
+}
+
+resource "azurerm_private_dns_zone" "sql" {
+  name                = "privatelink.database.windows.net"
+  resource_group_name = var.resource_group_name
+  tags                = var.tags
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "sql" {
+  name                  = "link-sql-novapay-${var.environment}"
+  resource_group_name   = var.resource_group_name
+  private_dns_zone_name = azurerm_private_dns_zone.sql.name
+  virtual_network_id    = var.virtual_network_id
+  tags                  = var.tags
 }
 
 # Nota de gobierno: las identidades administradas de App Service y
