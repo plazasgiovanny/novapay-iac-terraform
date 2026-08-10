@@ -102,6 +102,17 @@ resource "azurerm_function_app_flex_consumption" "this" {
     # conexión con clave compartida.
     serviceBusConnection__fullyQualifiedNamespace = var.servicebus_namespace_fqdn
     serviceBusConnection__credential              = "managedidentity"
+
+    # Nombre de la cola, para que los triggers/output bindings de
+    # ValidatePayment/ProcessPayment (%ServiceBusQueueName%) no lo
+    # hardcodeen por ambiente.
+    ServiceBusQueueName = var.servicebus_queue_name
+
+    # Conexión a Azure SQL por identidad administrada (Authentication=
+    # Active Directory Default en el código de la función) — solo
+    # nombres, nunca cadena de conexión con contraseña.
+    SqlServer__Fqdn     = var.sql_server_fqdn
+    SqlServer__Database = var.sql_database_name
   }
 
   tags = var.tags

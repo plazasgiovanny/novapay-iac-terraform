@@ -21,7 +21,8 @@ El código cubre la VNet spoke, sus subredes y NSG, el backend transaccional (Ap
 │   ├── dev/                   # Composición de menor costo, sin redundancia zonal
 │   └── prod/                  # SKU de mayor capacidad, redundancia zonal, retención >= 5 años
 ├── policies/                  # Reglas de Azure Policy (policy-as-code) referenciadas desde envs/*/policies.tf
-└── sql/                       # Scripts T-SQL versionados, fuera del ciclo de vida de azurerm
+├── sql/                       # Scripts T-SQL versionados, fuera del ciclo de vida de azurerm
+└── functions/                 # Código de aplicación (.NET, isolated worker) del flujo serverless — ver functions/README.md
 ```
 
 Cada módulo declara su contrato de entrada/salida en `variables.tf`/`outputs.tf` y documenta sus dependencias en su propio `README.md`. El orden de capas (red y seguridad base → plataforma → observabilidad) determina el orden real de despliegue.

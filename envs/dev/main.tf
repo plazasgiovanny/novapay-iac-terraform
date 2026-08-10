@@ -156,6 +156,9 @@ module "compute_serverless" {
   integracion_subnet_id         = module.networking.subnet_ids["integracion"]
   max_instance_count            = var.serverless_max_instance_count
   servicebus_namespace_fqdn     = module.messaging_servicebus.namespace_fqdn
+  servicebus_queue_name         = module.messaging_servicebus.queue_name
+  sql_server_fqdn               = module.data_sql.fully_qualified_domain_name
+  sql_database_name             = module.data_sql.database_name
   appinsights_connection_string = module.observability.appinsights_connection_string
   tags                          = local.common_tags
 }

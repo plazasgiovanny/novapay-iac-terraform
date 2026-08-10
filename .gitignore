@@ -35,3 +35,11 @@ override.tf.json
 # local.tfvars, pero efímero en el runner) — nunca versionado.
 ci.tfvars.json
 plan_output.txt
+
+# Proyecto .NET de las Azure Functions (functions/NovaPay.Payments).
+# local.settings.json es config de desarrollo local (nombres de
+# recursos por ambiente) — se versiona solo el .example sin datos de
+# un tenant real.
+functions/**/bin/
+functions/**/obj/
+functions/**/local.settings.json
