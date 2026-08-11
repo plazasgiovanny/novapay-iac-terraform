@@ -43,3 +43,5 @@ plan_output.txt
 functions/**/bin/
 functions/**/obj/
 functions/**/local.settings.json
+functions/**/publish_out/
+functions/**/*.zip
