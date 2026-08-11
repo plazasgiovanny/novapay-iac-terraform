@@ -93,16 +93,20 @@ resource "azurerm_function_app_flex_consumption" "this" {
   site_config {}
 
   app_settings = {
-    # AzureWebJobsStorage por identidad administrada (mismo patrón que
-    # Service Bus/SQL abajo) — sin esto, el runtime la resuelve con un
-    # AzureWebJobsStorage plano gestionado fuera de Terraform que quedó
-    # con una credencial inválida (health check interno reportaba
-    # "azure.functions.webjobs.storage": Unhealthy, AuthenticationFailed),
-    # lo que rompe "list keys"/"sync triggers" (necesitan escribir en
-    # azure-webjobs-secrets ahí) aunque el host arranque y cargue las
-    # funciones con normalidad.
-    AzureWebJobsStorage__accountName = azurerm_storage_account.this.name
-    AzureWebJobsStorage__credential  = "managedidentity"
+    # AzureWebJobsStorage por connection string, no por identidad
+    # administrada — excepción deliberada al patrón "sin cadenas de
+    # conexión" del resto de este bloque. azurerm_function_app_flex_consumption
+    # tiene un bug conocido y documentado (hashicorp/terraform-provider-azurerm#29149):
+    # la plataforma de Azure reinyecta un AzureWebJobsStorage plano con
+    # credencial inválida sin importar la configuración por identidad
+    # (__accountName/__credential), lo que rompe el host. El workaround
+    # oficial de Microsoft (AzureWebJobsStorage = "") solo evita el
+    # crash del host, pero un reporte confirmado de la comunidad muestra
+    # que además rompe el scale controller de triggers no-HTTP (colas)
+    # — inaceptable para ProcessPayment. Única solución confiable:
+    # connection string real, pero gestionada 100% por Terraform, nunca
+    # a mano (mismo criterio ya aceptado para la function key de APIM).
+    AzureWebJobsStorage = azurerm_storage_account.this.primary_connection_string
 
     # Application Insights por connection string (no instrumentation
     # key legacy) — trazas distribuidas de extremo a extremo.
@@ -144,14 +148,5 @@ resource "azurerm_function_app_flex_consumption" "this" {
 resource "azurerm_role_assignment" "storage_access" {
   scope                = azurerm_storage_account.this.id
   role_definition_name = "Storage Blob Data Owner"
-  principal_id         = azurerm_function_app_flex_consumption.this.identity[0].principal_id
-}
-
-# AzureWebJobsStorage por identidad administrada también usa colas
-# internamente (control de escalado, leases) — Storage Blob Data Owner
-# por sí solo no cubre el plano de datos de colas.
-resource "azurerm_role_assignment" "storage_queue_access" {
-  scope                = azurerm_storage_account.this.id
-  role_definition_name = "Storage Queue Data Contributor"
   principal_id         = azurerm_function_app_flex_consumption.this.identity[0].principal_id
 }
