@@ -39,15 +39,9 @@ variable "function_default_hostname" {
 }
 
 variable "rate_limit_calls_per_minute" {
-  description = "Límite de llamadas por minuto por subscription key (protección ante abuso)."
+  description = "Límite de llamadas por minuto por subscription (protección ante abuso) — política 'rate-limit', la única disponible en el tier Consumption de APIM."
   type        = number
   default     = 60
-}
-
-variable "quota_calls_per_day" {
-  description = "Cuota de llamadas por día por subscription key."
-  type        = number
-  default     = 5000
 }
 
 variable "tags" {

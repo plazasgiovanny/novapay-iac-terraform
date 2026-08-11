@@ -75,8 +75,15 @@ resource "azurerm_api_management_backend" "func" {
 }
 
 # Política de la operación: enruta al backend real y aplica rate
-# limiting / cuota por subscription key (protección ante abuso). Sin
-# prueba de carga real todavía.
+# limiting por subscription (protección ante abuso). "rate-limit" (no
+# "-by-key") es la única política de throttling disponible en el tier
+# Consumption_0 de APIM — verificado en Microsoft Learn, "rate-limit-by-key"
+# y "quota-by-key" no listan Consumption entre sus tiers soportados y el
+# apply real lo confirmó con un 400 ValidationError. Como ya es "per
+# subscription" por diseño, cubre la misma intención sin necesitar
+# counter-key. Cuota diaria por key queda fuera de alcance: no tiene
+# equivalente en Consumption (limitación real del SKU, no un olvido —
+# mismo criterio que Service Bus Standard sin Private Link).
 resource "azurerm_api_management_api_policy" "confirmaciones" {
   api_name            = azurerm_api_management_api.pagos.name
   api_management_name = azurerm_api_management.this.name
@@ -86,8 +93,7 @@ resource "azurerm_api_management_api_policy" "confirmaciones" {
 <policies>
   <inbound>
     <base />
-    <rate-limit-by-key calls="${var.rate_limit_calls_per_minute}" renewal-period="60" counter-key="@(context.Subscription.Id)" />
-    <quota-by-key calls="${var.quota_calls_per_day}" renewal-period="86400" counter-key="@(context.Subscription.Id)" />
+    <rate-limit calls="${var.rate_limit_calls_per_minute}" renewal-period="60" />
     <set-backend-service backend-id="${azurerm_api_management_backend.func.name}" />
   </inbound>
   <backend>
