@@ -42,73 +42,66 @@ resource "azurerm_api_management_api_operation" "confirmaciones" {
   }
 }
 
-# TEMPORALMENTE COMENTADO (despliegue real de evidencia, ver
-# 03_guia_despliegue_manual.md): data.azurerm_function_app_host_keys
-# necesita que el runtime del Function App responda a "listkeys", y
-# eso falla con "InternalServerError from host runtime" mientras no
-# haya código de función real desplegado (responsabilidad de Johan,
-# Fase 4) — confirmado con un apply real que se quedó reintentando
-# indefinidamente. Reactivar esta sección (data source + named_value +
-# backend + policy) una vez Johan tenga código desplegado en
-# func-novapay-pagos-{env}.
-#
-# data "azurerm_function_app_host_keys" "pagos" {
-#   name                = var.function_app_name
-#   resource_group_name = var.resource_group_name
-#   depends_on          = [var.function_app_id]
-# }
-#
-# resource "azurerm_api_management_named_value" "func_host_key" {
-#   name                = "func-novapay-pagos-host-key"
-#   resource_group_name = var.resource_group_name
-#   api_management_name = azurerm_api_management.this.name
-#   display_name        = "func-novapay-pagos-host-key"
-#   value               = data.azurerm_function_app_host_keys.pagos.default_function_key
-#   secret              = true
-# }
-#
-# resource "azurerm_api_management_backend" "func" {
-#   name                = "func-novapay-pagos-backend"
-#   resource_group_name = var.resource_group_name
-#   api_management_name = azurerm_api_management.this.name
-#   protocol            = "http"
-#   url                 = "https://${var.function_default_hostname}/api"
-#
-#   credentials {
-#     header = {
-#       "x-functions-key" = "{{${azurerm_api_management_named_value.func_host_key.display_name}}}"
-#     }
-#   }
-# }
-#
-# # Política de la operación: enruta al backend real y aplica rate
-# # limiting / cuota por subscription key (protección ante abuso). Sin
-# # prueba de carga real todavía.
-# resource "azurerm_api_management_api_policy" "confirmaciones" {
-#   api_name            = azurerm_api_management_api.pagos.name
-#   api_management_name = azurerm_api_management.this.name
-#   resource_group_name = var.resource_group_name
-#
-#   xml_content = <<XML
-# <policies>
-#   <inbound>
-#     <base />
-#     <rate-limit-by-key calls="${var.rate_limit_calls_per_minute}" renewal-period="60" counter-key="@(context.Subscription.Id)" />
-#     <quota-by-key calls="${var.quota_calls_per_day}" renewal-period="86400" counter-key="@(context.Subscription.Id)" />
-#     <set-backend-service backend-id="${azurerm_api_management_backend.func.name}" />
-#   </inbound>
-#   <backend>
-#     <base />
-#   </backend>
-#   <outbound>
-#     <base />
-#   </outbound>
-#   <on-error>
-#     <base />
-#   </on-error>
-# </policies>
-# XML
-# }
+# Host key leída en vivo del Function App backend — requiere que su
+# runtime responda "list keys" con éxito (necesita código desplegado y
+# AzureWebJobsStorage saludable; ver modules/compute-serverless).
+data "azurerm_function_app_host_keys" "pagos" {
+  name                = var.function_app_name
+  resource_group_name = var.resource_group_name
+  depends_on          = [var.function_app_id]
+}
+
+resource "azurerm_api_management_named_value" "func_host_key" {
+  name                = "func-novapay-pagos-host-key"
+  resource_group_name = var.resource_group_name
+  api_management_name = azurerm_api_management.this.name
+  display_name        = "func-novapay-pagos-host-key"
+  value               = data.azurerm_function_app_host_keys.pagos.default_function_key
+  secret              = true
+}
+
+resource "azurerm_api_management_backend" "func" {
+  name                = "func-novapay-pagos-backend"
+  resource_group_name = var.resource_group_name
+  api_management_name = azurerm_api_management.this.name
+  protocol            = "http"
+  url                 = "https://${var.function_default_hostname}/api"
+
+  credentials {
+    header = {
+      "x-functions-key" = "{{${azurerm_api_management_named_value.func_host_key.display_name}}}"
+    }
+  }
+}
+
+# Política de la operación: enruta al backend real y aplica rate
+# limiting / cuota por subscription key (protección ante abuso). Sin
+# prueba de carga real todavía.
+resource "azurerm_api_management_api_policy" "confirmaciones" {
+  api_name            = azurerm_api_management_api.pagos.name
+  api_management_name = azurerm_api_management.this.name
+  resource_group_name = var.resource_group_name
+
+  xml_content = <<XML
+<policies>
+  <inbound>
+    <base />
+    <rate-limit-by-key calls="${var.rate_limit_calls_per_minute}" renewal-period="60" counter-key="@(context.Subscription.Id)" />
+    <quota-by-key calls="${var.quota_calls_per_day}" renewal-period="86400" counter-key="@(context.Subscription.Id)" />
+    <set-backend-service backend-id="${azurerm_api_management_backend.func.name}" />
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>
+XML
+}
 
 resource "azurerm_api_management_product" "pagos" {
   product_id            = "pagos-novapay"
