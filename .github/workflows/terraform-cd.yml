@@ -75,9 +75,10 @@ jobs:
             --arg aad_admin_login "$AAD_ADMIN_LOGIN" \
             --arg aad_admin_object_id "$AAD_ADMIN_OBJECT_ID" \
             --arg deployer_principal_id "$DEPLOYER_PRINCIPAL_ID" \
+            --arg servicebus_diagnostics_principal_id "$SERVICEBUS_DIAGNOSTICS_PRINCIPAL_ID" \
             --arg alert_email "$ALERT_EMAIL" \
             --arg apim_publisher_email "$APIM_PUBLISHER_EMAIL" \
-            '{tenant_id:$tenant_id, subscription_id:$subscription_id, hub_vnet_id:$hub_vnet_id, aad_admin_login:$aad_admin_login, aad_admin_object_id:$aad_admin_object_id, deployer_principal_id:$deployer_principal_id, alert_email:$alert_email, apim_publisher_email:$apim_publisher_email}' \
+            '{tenant_id:$tenant_id, subscription_id:$subscription_id, hub_vnet_id:$hub_vnet_id, aad_admin_login:$aad_admin_login, aad_admin_object_id:$aad_admin_object_id, deployer_principal_id:$deployer_principal_id, servicebus_diagnostics_principal_id:$servicebus_diagnostics_principal_id, alert_email:$alert_email, apim_publisher_email:$apim_publisher_email}' \
             > ci.tfvars.json
 
           terraform plan -input=false -var-file=prod.tfvars -var-file=ci.tfvars.json -out=tfplan -no-color | tee plan_output.txt
@@ -94,6 +95,7 @@ jobs:
           AAD_ADMIN_LOGIN: ${{ secrets.TF_VAR_AAD_ADMIN_LOGIN }}
           AAD_ADMIN_OBJECT_ID: ${{ secrets.TF_VAR_AAD_ADMIN_OBJECT_ID }}
           DEPLOYER_PRINCIPAL_ID: ${{ secrets.TF_VAR_DEPLOYER_PRINCIPAL_ID }}
+          SERVICEBUS_DIAGNOSTICS_PRINCIPAL_ID: ${{ secrets.TF_VAR_SERVICEBUS_DIAGNOSTICS_PRINCIPAL_ID }}
           ALERT_EMAIL: ${{ secrets.TF_VAR_ALERT_EMAIL }}
           APIM_PUBLISHER_EMAIL: ${{ secrets.TF_VAR_APIM_PUBLISHER_EMAIL }}
 
