@@ -28,6 +28,21 @@ variable "servicebus_namespace_fqdn" {
   type        = string
 }
 
+variable "servicebus_queue_name" {
+  description = "Nombre de la cola sbq-novapay-pagos-pendientes (salida de messaging-servicebus), inyectado como app setting ServiceBusQueueName para que ValidatePayment/ProcessPayment no hardcodeen el nombre por ambiente."
+  type        = string
+}
+
+variable "sql_server_fqdn" {
+  description = "FQDN del servidor Azure SQL (salida de data-sql), inyectado como app setting SqlServer__Fqdn."
+  type        = string
+}
+
+variable "sql_database_name" {
+  description = "Nombre de la base de datos Azure SQL (salida de data-sql), inyectado como app setting SqlServer__Database."
+  type        = string
+}
+
 variable "appinsights_connection_string" {
   description = "Connection string de Application Insights (salida de observability), usado para trazas distribuidas."
   type        = string
