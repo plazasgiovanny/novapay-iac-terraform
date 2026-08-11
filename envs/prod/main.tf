@@ -194,6 +194,19 @@ resource "azurerm_role_assignment" "func_pagos_sb_receiver" {
   principal_id         = module.compute_serverless.principal_id
 }
 
+# Acceso de diagnóstico acotado a la cola, mismo patrón condicional que
+# func_pagos_deployer — "Data Owner" (no solo Sender/Receiver) porque
+# cubre tanto publicar mensajes de prueba directamente (sin pasar por
+# ValidatePayment, para aislar bugs de serialización del binding de
+# salida vs. la deserialización de ProcessPayment) como usar el Service
+# Bus Explorer del portal (peek/receive/send), que exige más que Sender.
+resource "azurerm_role_assignment" "servicebus_diagnostics" {
+  count                = var.servicebus_diagnostics_principal_id != "" ? 1 : 0
+  scope                = module.messaging_servicebus.queue_id
+  role_definition_name = "Azure Service Bus Data Owner"
+  principal_id         = var.servicebus_diagnostics_principal_id
+}
+
 # Acceso de despliegue acotado al Function App serverless, solo para
 # quien vaya a publicar el código de la función — nunca por publish
 # profile (credencial SCM de larga duración), sino por rol RBAC

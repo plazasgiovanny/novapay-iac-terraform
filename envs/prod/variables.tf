@@ -121,6 +121,13 @@ variable "deployer_principal_id" {
   sensitive   = true
 }
 
+variable "servicebus_diagnostics_principal_id" {
+  description = "Object ID de la identidad (usuario o service principal) que recibe 'Azure Service Bus Data Owner' acotado a la cola sbq-novapay-pagos-pendientes-{env}, para poder usar el Service Bus Explorer del portal (peek/receive/send) y publicar mensajes de prueba/diagnóstico directamente sin pasar por ValidatePayment. Vacío por defecto (nadie recibe el rol)."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 # --- Variables del flujo serverless ---
 
 variable "apim_publisher_name" {
