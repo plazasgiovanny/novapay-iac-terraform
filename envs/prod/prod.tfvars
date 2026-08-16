@@ -126,6 +126,15 @@ keyvault_name_suffix = "-v4"
 apim_publisher_name  = "NovaPay - Plataforma"
 apim_publisher_email = "sre-novapay@example.com"
 
+# HALLAZGO REAL (apply de reconstrucción, 2026-08-16): el apply se
+# quedó colgado en data.azurerm_function_app_host_keys — el Function
+# App recién creado no tiene código desplegado todavía (eso lo hace un
+# pipeline aparte, ver ADR-01/02), así que su runtime nunca responde
+# "list keys" con éxito. false aquí para completar el bootstrap sin esa
+# cadena; volver a true (y re-aplicar) una vez el primer despliegue de
+# código a func-novapay-pagos-prod sea exitoso.
+apim_wire_backend = false
+
 # Techo de instancias reconciliado contra el límite real de Azure SQL
 # BC_Gen5_4 (400 concurrent workers, Microsoft Learn): reserva ~15%
 # del presupuesto (60 workers) para este flujo, compartido con el

@@ -175,6 +175,7 @@ module "api_management" {
   function_app_name         = module.compute_serverless.function_app_name
   function_app_id           = module.compute_serverless.function_app_id
   function_default_hostname = module.compute_serverless.default_hostname
+  wire_backend              = var.apim_wire_backend
   tags                      = local.common_tags
 }
 

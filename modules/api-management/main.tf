@@ -45,22 +45,28 @@ resource "azurerm_api_management_api_operation" "confirmaciones" {
 # Host key leída en vivo del Function App backend — requiere que su
 # runtime responda "list keys" con éxito (necesita código desplegado y
 # AzureWebJobsStorage saludable; ver modules/compute-serverless).
+# Gateado por var.wire_backend: en el apply inicial de bootstrap (antes
+# de que exista ningún código desplegado) esta cadena completa se omite;
+# se activa en un apply posterior, ver descripción de la variable.
 data "azurerm_function_app_host_keys" "pagos" {
+  count               = var.wire_backend ? 1 : 0
   name                = var.function_app_name
   resource_group_name = var.resource_group_name
   depends_on          = [var.function_app_id]
 }
 
 resource "azurerm_api_management_named_value" "func_host_key" {
+  count               = var.wire_backend ? 1 : 0
   name                = "func-novapay-pagos-host-key"
   resource_group_name = var.resource_group_name
   api_management_name = azurerm_api_management.this.name
   display_name        = "func-novapay-pagos-host-key"
-  value               = data.azurerm_function_app_host_keys.pagos.default_function_key
+  value               = data.azurerm_function_app_host_keys.pagos[0].default_function_key
   secret              = true
 }
 
 resource "azurerm_api_management_backend" "func" {
+  count               = var.wire_backend ? 1 : 0
   name                = "func-novapay-pagos-backend"
   resource_group_name = var.resource_group_name
   api_management_name = azurerm_api_management.this.name
@@ -69,7 +75,7 @@ resource "azurerm_api_management_backend" "func" {
 
   credentials {
     header = {
-      "x-functions-key" = "{{${azurerm_api_management_named_value.func_host_key.display_name}}}"
+      "x-functions-key" = "{{${azurerm_api_management_named_value.func_host_key[0].display_name}}}"
     }
   }
 }
@@ -84,7 +90,13 @@ resource "azurerm_api_management_backend" "func" {
 # counter-key. Cuota diaria por key queda fuera de alcance: no tiene
 # equivalente en Consumption (limitación real del SKU, no un olvido —
 # mismo criterio que Service Bus Standard sin Private Link).
+# También gateada por var.wire_backend: sin backend creado no hay
+# backend-id válido que referenciar. Mientras tanto la operación queda
+# sin política propia (hereda el comportamiento por defecto de APIM,
+# sin ruta configurada) — aceptable en el bootstrap porque tampoco hay
+# código desplegado que pudiera responder.
 resource "azurerm_api_management_api_policy" "confirmaciones" {
+  count               = var.wire_backend ? 1 : 0
   api_name            = azurerm_api_management_api.pagos.name
   api_management_name = azurerm_api_management.this.name
   resource_group_name = var.resource_group_name
@@ -94,7 +106,7 @@ resource "azurerm_api_management_api_policy" "confirmaciones" {
   <inbound>
     <base />
     <rate-limit calls="${var.rate_limit_calls_per_minute}" renewal-period="60" />
-    <set-backend-service backend-id="${azurerm_api_management_backend.func.name}" />
+    <set-backend-service backend-id="${azurerm_api_management_backend.func[0].name}" />
   </inbound>
   <backend>
     <base />

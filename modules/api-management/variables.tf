@@ -48,3 +48,17 @@ variable "tags" {
   description = "Etiquetas obligatorias."
   type        = map(string)
 }
+
+variable "wire_backend" {
+  description = <<-EOT
+    Si es false, omite el named_value de host key, el backend hacia el
+    Function App y la policy que lo referencia. Necesario para el apply
+    inicial de bootstrap: el data source de host keys requiere que el
+    Function App ya tenga código desplegado y su runtime esté sano, algo
+    que no existe todavía en un ambiente recién creado (el código se
+    despliega por un pipeline aparte, ver ADR-01/02). Poner en true y
+    reaplicar una vez confirmado el primer despliegue de código exitoso.
+  EOT
+  type        = bool
+  default     = true
+}
