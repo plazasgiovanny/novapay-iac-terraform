@@ -14,16 +14,17 @@ El código cubre la VNet spoke, sus subredes y NSG, el backend transaccional (Ap
 │   ├── data-sql/              # Azure SQL Database, autenticación solo Microsoft Entra ID
 │   ├── compute-appservice/    # App Service + Functions con identidad administrada
 │   ├── observability/         # Log Analytics Workspace, Application Insights, diagnostic settings
-│   ├── messaging-servicebus/  # Namespace + cola con DLQ para el flujo de confirmación de pagos
-│   ├── compute-serverless/    # Function App en Flex Consumption para ese mismo flujo
-│   └── api-management/        # API Gateway expuesto a clientes/comercios
+│   ├── messaging-servicebus/  # Namespace + Topic con una Subscription por instancia (estable/canary) del flujo de pagos
+│   ├── compute-serverless/    # Function App en Flex Consumption, instanciado dos veces (estable/canary)
+│   └── api-management/        # API Gateway expuesto a clientes/comercios, backend pool ponderado
 ├── envs/
 │   ├── dev/                   # Composición de menor costo, sin redundancia zonal
 │   └── prod/                  # SKU de mayor capacidad, redundancia zonal, retención >= 5 años
 ├── policies/                  # Reglas de Azure Policy (policy-as-code) referenciadas desde envs/*/policies.tf
-├── sql/                       # Scripts T-SQL versionados, fuera del ciclo de vida de azurerm
-└── functions/                 # Código de aplicación (.NET, isolated worker) del flujo serverless — ver functions/README.md
+└── sql/                       # Scripts T-SQL versionados, fuera del ciclo de vida de azurerm
 ```
+
+El código de aplicación del flujo serverless (`ValidatePayment`/`ProcessPayment`) vivía en este repo hasta la Unidad 4 (`functions/NovaPay.Payments/`); se extrajo a un repositorio propio, [`novapay-functions`](https://github.com/plazasgiovanny/novapay-functions), con cadencia de release independiente de la infraestructura. Este repo aprovisiona el *shell* del recurso (runtime, integración VNet, identidad, escalado); `novapay-functions` gestiona y despliega el código que corre dentro.
 
 Cada módulo declara su contrato de entrada/salida en `variables.tf`/`outputs.tf` y documenta sus dependencias en su propio `README.md`. El orden de capas (red y seguridad base → plataforma → observabilidad) determina el orden real de despliegue.
 
