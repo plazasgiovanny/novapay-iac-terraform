@@ -73,14 +73,15 @@ module "observability" {
   tags                = local.common_tags
 
   monitored_resource_ids = {
-    vnet         = module.networking.vnet_id
-    key_vault    = module.security_keyvault.key_vault_id
-    sql_database = module.data_sql.database_id
-    app_service  = module.compute_appservice.api_id
-    functions    = module.compute_appservice.functions_id
-    service_bus  = module.messaging_servicebus.namespace_id
-    apim         = module.api_management.id
-    func_pagos   = module.compute_serverless.function_app_id
+    vnet              = module.networking.vnet_id
+    key_vault         = module.security_keyvault.key_vault_id
+    sql_database      = module.data_sql.database_id
+    app_service       = module.compute_appservice.api_id
+    functions         = module.compute_appservice.functions_id
+    service_bus       = module.messaging_servicebus.namespace_id
+    apim              = module.api_management.id
+    func_pagos        = module.compute_serverless.function_app_id
+    func_pagos_canary = module.compute_serverless_canary.function_app_id
   }
 }
 
@@ -156,8 +157,36 @@ module "compute_serverless" {
   resource_group_name           = azurerm_resource_group.this.name
   integracion_subnet_id         = module.networking.subnet_ids["integracion"]
   max_instance_count            = var.serverless_max_instance_count
+  instance_suffix               = ""
+  storage_account_name          = "stnovapaypagos${var.environment}"
   servicebus_namespace_fqdn     = module.messaging_servicebus.namespace_fqdn
-  servicebus_queue_name         = module.messaging_servicebus.queue_name
+  servicebus_topic_name         = module.messaging_servicebus.topic_name
+  servicebus_subscription_name  = module.messaging_servicebus.subscription_names["estable"]
+  sql_server_fqdn               = module.data_sql.fully_qualified_domain_name
+  sql_database_name             = module.data_sql.database_name
+  appinsights_connection_string = module.observability.appinsights_connection_string
+  tags                          = local.common_tags
+}
+
+# Segunda instancia física (candidata), recurso fijo sin jerarquía
+# permanente — cuál instancia sirve tráfico vigente lo decide el peso
+# del backend pool de APIM en cada momento, no el nombre de este
+# recurso (ADR-03, U4). Plan y storage account dedicados, nunca
+# compartidos con la estable, para que un despliegue corrupto de una
+# no afecte a la otra.
+module "compute_serverless_canary" {
+  source = "../../modules/compute-serverless"
+
+  environment                   = var.environment
+  location                      = var.location
+  resource_group_name           = azurerm_resource_group.this.name
+  integracion_subnet_id         = module.networking.subnet_ids["integracion"]
+  max_instance_count            = var.serverless_max_instance_count
+  instance_suffix               = "-canary"
+  storage_account_name          = "stnpypagoscanary${var.environment}"
+  servicebus_namespace_fqdn     = module.messaging_servicebus.namespace_fqdn
+  servicebus_topic_name         = module.messaging_servicebus.topic_name
+  servicebus_subscription_name  = module.messaging_servicebus.subscription_names["canary"]
   sql_server_fqdn               = module.data_sql.fully_qualified_domain_name
   sql_database_name             = module.data_sql.database_name
   appinsights_connection_string = module.observability.appinsights_connection_string
@@ -179,43 +208,66 @@ module "api_management" {
   tags                      = local.common_tags
 }
 
-# Identidad compartida por ValidatePayment y ProcessPayment (un único
-# Function App = una única identidad SystemAssigned): recibe ambos
-# roles de Service Bus, acotados a la cola específica, no al namespace
-# completo.
+# Cada instancia física recibe Sender sobre el Topic completo (ambas
+# publican al mismo Topic) pero Receiver únicamente sobre su propia
+# Subscription — nunca la del otro slot. Refuerza a nivel de RBAC el
+# aislamiento que ya da el filtro SQL de sourceInstance: aunque una
+# instancia tuviera un bug que ignorara ese filtro, no tiene permiso
+# para leer la Subscription ajena.
 resource "azurerm_role_assignment" "func_pagos_sb_sender" {
-  scope                = module.messaging_servicebus.queue_id
+  scope                = module.messaging_servicebus.topic_id
   role_definition_name = "Azure Service Bus Data Sender"
   principal_id         = module.compute_serverless.principal_id
 }
 
 resource "azurerm_role_assignment" "func_pagos_sb_receiver" {
-  scope                = module.messaging_servicebus.queue_id
+  scope                = module.messaging_servicebus.subscription_ids["estable"]
   role_definition_name = "Azure Service Bus Data Receiver"
   principal_id         = module.compute_serverless.principal_id
 }
 
-# Acceso de diagnóstico acotado a la cola, mismo patrón condicional que
-# func_pagos_deployer — "Data Owner" (no solo Sender/Receiver) porque
-# cubre tanto publicar mensajes de prueba directamente (sin pasar por
-# ValidatePayment, para aislar bugs de serialización del binding de
-# salida vs. la deserialización de ProcessPayment) como usar el Service
-# Bus Explorer del portal (peek/receive/send), que exige más que Sender.
+resource "azurerm_role_assignment" "func_pagos_canary_sb_sender" {
+  scope                = module.messaging_servicebus.topic_id
+  role_definition_name = "Azure Service Bus Data Sender"
+  principal_id         = module.compute_serverless_canary.principal_id
+}
+
+resource "azurerm_role_assignment" "func_pagos_canary_sb_receiver" {
+  scope                = module.messaging_servicebus.subscription_ids["canary"]
+  role_definition_name = "Azure Service Bus Data Receiver"
+  principal_id         = module.compute_serverless_canary.principal_id
+}
+
+# Acceso de diagnóstico a nivel de namespace (ya no una sola cola: hay
+# un Topic, 2 Subscriptions y 2 colas de aterrizaje de DLQ que
+# inspeccionar) — "Data Owner" porque cubre tanto publicar mensajes de
+# prueba directamente (sin pasar por ValidatePayment, para aislar bugs
+# de serialización del binding de salida vs. la deserialización de
+# ProcessPayment) como usar el Service Bus Explorer del portal
+# (peek/receive/send), que exige más que Sender.
 resource "azurerm_role_assignment" "servicebus_diagnostics" {
   count                = var.servicebus_diagnostics_principal_id != "" ? 1 : 0
-  scope                = module.messaging_servicebus.queue_id
+  scope                = module.messaging_servicebus.namespace_id
   role_definition_name = "Azure Service Bus Data Owner"
   principal_id         = var.servicebus_diagnostics_principal_id
 }
 
-# Acceso de despliegue acotado al Function App serverless, solo para
-# quien vaya a publicar el código de la función — nunca por publish
+# Acceso de despliegue acotado a cada Function App serverless, solo
+# para quien vaya a publicar código manualmente — nunca por publish
 # profile (credencial SCM de larga duración), sino por rol RBAC
 # revocable, coherente con el resto del proyecto (sin secretos
-# gestionados manualmente).
+# gestionados manualmente). Ambas instancias, porque el destino de un
+# despliegue puntual puede ser cualquiera de las dos (ADR-03).
 resource "azurerm_role_assignment" "func_pagos_deployer" {
   count                = var.deployer_principal_id != "" ? 1 : 0
   scope                = module.compute_serverless.function_app_id
+  role_definition_name = "Website Contributor"
+  principal_id         = var.deployer_principal_id
+}
+
+resource "azurerm_role_assignment" "func_pagos_canary_deployer" {
+  count                = var.deployer_principal_id != "" ? 1 : 0
+  scope                = module.compute_serverless_canary.function_app_id
   role_definition_name = "Website Contributor"
   principal_id         = var.deployer_principal_id
 }

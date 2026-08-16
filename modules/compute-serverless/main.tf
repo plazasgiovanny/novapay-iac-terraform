@@ -17,7 +17,7 @@
 # no existe en versiones anteriores.
 
 resource "azurerm_service_plan" "this" {
-  name                = "asp-novapay-serverless-${var.environment}"
+  name                = "asp-novapay-serverless${var.instance_suffix}-${var.environment}"
   location            = var.location
   resource_group_name = var.resource_group_name
   os_type             = "Linux"
@@ -25,12 +25,14 @@ resource "azurerm_service_plan" "this" {
   tags                = var.tags
 }
 
-# Cuenta de almacenamiento exclusiva de este Function App (runtime,
-# no datos de negocio) — no se comparte con stnovapayfunc${env}
-# (async_workers) para no acoplar dos workloads con ciclos de vida y
-# volúmenes de operación distintos.
+# Cuenta de almacenamiento exclusiva de esta instancia (runtime, no
+# datos de negocio) — no se comparte con stnovapayfunc${env}
+# (async_workers) ni con la otra instancia física (estable/canary),
+# para no acoplar workloads con ciclos de vida y volúmenes de
+# operación distintos, ni permitir que un despliegue corrupto de una
+# instancia afecte a la otra.
 resource "azurerm_storage_account" "this" {
-  name                     = "stnovapaypagos${var.environment}"
+  name                     = var.storage_account_name
   location                 = var.location
   resource_group_name      = var.resource_group_name
   account_tier             = "Standard"
@@ -42,13 +44,13 @@ resource "azurerm_storage_account" "this" {
 # de despliegue (no basta con "una cuenta de almacenamiento" como en
 # el modelo clásico de azurerm_linux_function_app).
 resource "azurerm_storage_container" "deployments" {
-  name                  = "func-novapay-pagos-deployments"
+  name                  = "func-novapay-pagos${var.instance_suffix}-deployments"
   storage_account_id    = azurerm_storage_account.this.id
   container_access_type = "private"
 }
 
 resource "azurerm_function_app_flex_consumption" "this" {
-  name                = "func-novapay-pagos-${var.environment}"
+  name                = "func-novapay-pagos${var.instance_suffix}-${var.environment}"
   location            = var.location
   resource_group_name = var.resource_group_name
   service_plan_id     = azurerm_service_plan.this.id
@@ -90,7 +92,23 @@ resource "azurerm_function_app_flex_consumption" "this" {
     type = "SystemAssigned"
   }
 
-  site_config {}
+  # ip_restriction del sitio principal (tráfico de invocación real, el
+  # que atraviesa APIM) — DENY por defecto salvo el service tag de
+  # APIM. Deliberadamente NO se toca scm_ip_restriction aquí: el
+  # despliegue de código (ADR-02, zip deploy vía OIDC desde GitHub
+  # Actions) usa el endpoint SCM/Kudu, con IPs de runner dinámicas que
+  # no pertenecen a ningún service tag fijo — restringirlo también
+  # rompería el pipeline de despliegue de novapay-functions.
+  site_config {
+    ip_restriction_default_action = "Deny"
+
+    ip_restriction {
+      name        = "allow-apim"
+      priority    = 100
+      action      = "Allow"
+      service_tag = var.apim_service_tag
+    }
+  }
 
   app_settings = {
     # AzureWebJobsStorage por connection string, no por identidad
@@ -118,10 +136,12 @@ resource "azurerm_function_app_flex_consumption" "this" {
     serviceBusConnection__fullyQualifiedNamespace = var.servicebus_namespace_fqdn
     serviceBusConnection__credential              = "managedidentity"
 
-    # Nombre de la cola, para que los triggers/output bindings de
-    # ValidatePayment/ProcessPayment (%ServiceBusQueueName%) no lo
-    # hardcodeen por ambiente.
-    ServiceBusQueueName = var.servicebus_queue_name
+    # Topic (compartido por ambas instancias) y Subscription (propia de
+    # esta instancia), para que los triggers/output bindings de
+    # ValidatePayment/ProcessPayment (%ServiceBusTopicName%/
+    # %ServiceBusSubscriptionName%) no los hardcodeen por ambiente.
+    ServiceBusTopicName        = var.servicebus_topic_name
+    ServiceBusSubscriptionName = var.servicebus_subscription_name
 
     # Conexión a Azure SQL por identidad administrada (Authentication=
     # Active Directory Default en el código de la función) — solo

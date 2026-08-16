@@ -18,6 +18,17 @@ variable "integracion_subnet_id" {
   type        = string
 }
 
+variable "instance_suffix" {
+  description = "Sufijo de nombre de esta instancia física: \"\" para la estable (func-novapay-pagos-{env}), \"-canary\" para la candidata (func-novapay-pagos-canary-{env}) — ADR-03 U4. Debe coincidir literalmente con el sufijo usado en la Subscription de Service Bus correspondiente, porque sourceInstance compara contra WEBSITE_SITE_NAME (= el nombre real de este recurso)."
+  type        = string
+  default     = ""
+}
+
+variable "storage_account_name" {
+  description = "Nombre de la cuenta de almacenamiento dedicada de esta instancia. Explícito (no derivado de instance_suffix dentro del módulo) porque el límite de 24 caracteres de Storage Account exige un nombre abreviado propio para la instancia canary, no una simple concatenación de sufijo."
+  type        = string
+}
+
 variable "max_instance_count" {
   description = "Techo de instancias del Function App, reconciliado contra el límite real de concurrent workers de la Azure SQL Database reutilizada. Distinto por ambiente porque el SKU de SQL también lo es — sin default deliberado, para forzar una decisión explícita por ambiente en dev.tfvars/prod.tfvars."
   type        = number
@@ -28,9 +39,20 @@ variable "servicebus_namespace_fqdn" {
   type        = string
 }
 
-variable "servicebus_queue_name" {
-  description = "Nombre de la cola sbq-novapay-pagos-pendientes (salida de messaging-servicebus), inyectado como app setting ServiceBusQueueName para que ValidatePayment/ProcessPayment no hardcodeen el nombre por ambiente."
+variable "servicebus_topic_name" {
+  description = "Nombre del Topic sbt-novapay-pagos-pendientes (salida de messaging-servicebus), inyectado como app setting ServiceBusTopicName. Mismo Topic para ambas instancias — el aislamiento ocurre en la Subscription, no en el Topic."
   type        = string
+}
+
+variable "servicebus_subscription_name" {
+  description = "Nombre de la Subscription propia de esta instancia (salida de messaging-servicebus, mapa por clave estable/canary), inyectado como app setting ServiceBusSubscriptionName. Específico de cada instancia — nunca la Subscription del otro slot."
+  type        = string
+}
+
+variable "apim_service_tag" {
+  description = "Service tag de Azure usado en ip_restriction del site_config, para que el Function App solo acepte tráfico del gateway de APIM (nunca directo de Internet) — el function key es defensa en profundidad, no la única barrera."
+  type        = string
+  default     = "ApiManagement"
 }
 
 variable "sql_server_fqdn" {

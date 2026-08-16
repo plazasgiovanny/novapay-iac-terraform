@@ -73,14 +73,15 @@ module "observability" {
   tags                = local.common_tags
 
   monitored_resource_ids = {
-    vnet         = module.networking.vnet_id
-    key_vault    = module.security_keyvault.key_vault_id
-    sql_database = module.data_sql.database_id
-    app_service  = module.compute_appservice.api_id
-    functions    = module.compute_appservice.functions_id
-    service_bus  = module.messaging_servicebus.namespace_id
-    apim         = module.api_management.id
-    func_pagos   = module.compute_serverless.function_app_id
+    vnet              = module.networking.vnet_id
+    key_vault         = module.security_keyvault.key_vault_id
+    sql_database      = module.data_sql.database_id
+    app_service       = module.compute_appservice.api_id
+    functions         = module.compute_appservice.functions_id
+    service_bus       = module.messaging_servicebus.namespace_id
+    apim              = module.api_management.id
+    func_pagos        = module.compute_serverless.function_app_id
+    func_pagos_canary = module.compute_serverless_canary.function_app_id
   }
 }
 
@@ -156,8 +157,30 @@ module "compute_serverless" {
   resource_group_name           = azurerm_resource_group.this.name
   integracion_subnet_id         = module.networking.subnet_ids["integracion"]
   max_instance_count            = var.serverless_max_instance_count
+  instance_suffix               = ""
+  storage_account_name          = "stnovapaypagos${var.environment}"
   servicebus_namespace_fqdn     = module.messaging_servicebus.namespace_fqdn
-  servicebus_queue_name         = module.messaging_servicebus.queue_name
+  servicebus_topic_name         = module.messaging_servicebus.topic_name
+  servicebus_subscription_name  = module.messaging_servicebus.subscription_names["estable"]
+  sql_server_fqdn               = module.data_sql.fully_qualified_domain_name
+  sql_database_name             = module.data_sql.database_name
+  appinsights_connection_string = module.observability.appinsights_connection_string
+  tags                          = local.common_tags
+}
+
+module "compute_serverless_canary" {
+  source = "../../modules/compute-serverless"
+
+  environment                   = var.environment
+  location                      = var.location
+  resource_group_name           = azurerm_resource_group.this.name
+  integracion_subnet_id         = module.networking.subnet_ids["integracion"]
+  max_instance_count            = var.serverless_max_instance_count
+  instance_suffix               = "-canary"
+  storage_account_name          = "stnpypagoscanary${var.environment}"
+  servicebus_namespace_fqdn     = module.messaging_servicebus.namespace_fqdn
+  servicebus_topic_name         = module.messaging_servicebus.topic_name
+  servicebus_subscription_name  = module.messaging_servicebus.subscription_names["canary"]
   sql_server_fqdn               = module.data_sql.fully_qualified_domain_name
   sql_database_name             = module.data_sql.database_name
   appinsights_connection_string = module.observability.appinsights_connection_string
@@ -178,18 +201,30 @@ module "api_management" {
   tags                      = local.common_tags
 }
 
-# Identidad compartida por ValidatePayment y ProcessPayment (un único
-# Function App = una única identidad SystemAssigned): recibe ambos
-# roles de Service Bus, acotados a la cola específica, no al namespace
-# completo.
+# Cada instancia física recibe Sender sobre el Topic completo (ambas
+# publican al mismo Topic) pero Receiver únicamente sobre su propia
+# Subscription — nunca la del otro slot (ver envs/prod/main.tf para el
+# detalle del razonamiento, idéntico aquí).
 resource "azurerm_role_assignment" "func_pagos_sb_sender" {
-  scope                = module.messaging_servicebus.queue_id
+  scope                = module.messaging_servicebus.topic_id
   role_definition_name = "Azure Service Bus Data Sender"
   principal_id         = module.compute_serverless.principal_id
 }
 
 resource "azurerm_role_assignment" "func_pagos_sb_receiver" {
-  scope                = module.messaging_servicebus.queue_id
+  scope                = module.messaging_servicebus.subscription_ids["estable"]
   role_definition_name = "Azure Service Bus Data Receiver"
   principal_id         = module.compute_serverless.principal_id
+}
+
+resource "azurerm_role_assignment" "func_pagos_canary_sb_sender" {
+  scope                = module.messaging_servicebus.topic_id
+  role_definition_name = "Azure Service Bus Data Sender"
+  principal_id         = module.compute_serverless_canary.principal_id
+}
+
+resource "azurerm_role_assignment" "func_pagos_canary_sb_receiver" {
+  scope                = module.messaging_servicebus.subscription_ids["canary"]
+  role_definition_name = "Azure Service Bus Data Receiver"
+  principal_id         = module.compute_serverless_canary.principal_id
 }
