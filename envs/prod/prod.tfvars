@@ -108,11 +108,12 @@ alert_email       = "sre-novapay@example.com"
 
 # Cada intento real de despliegue destruido deja su Key Vault en
 # soft-delete con purge_protection_enabled = true (no se puede purgar
-# ni reusar el nombre hasta que expire su retención) — kv-novapay-prod
-# y kv-novapay-prod-v2 ya quedaron así tras rondas anteriores. Sufijo
-# temporal para poder desplegar mientras tanto; quitar cuando ya no
-# aplique (y limpiar los soft-deleted acumulados).
-keyvault_name_suffix = "-v3"
+# ni reusar el nombre hasta que expire su retención) — kv-novapay-prod,
+# kv-novapay-prod-v2 y kv-novapay-prod-v3 ya quedaron así tras rondas
+# anteriores (esta última tras el ciclo de reconstrucción de Fase 3,
+# 2026-08). Sufijo temporal para poder desplegar mientras tanto; quitar
+# cuando ya no aplique (y limpiar los soft-deleted acumulados).
+keyvault_name_suffix = "-v4"
 
 # Rol de despliegue (Website Contributor, acotado al Function App
 # serverless) para poder publicar código sin publish profile. Vacío
