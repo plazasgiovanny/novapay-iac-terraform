@@ -49,11 +49,6 @@ variable "servicebus_subscription_name" {
   type        = string
 }
 
-variable "apim_service_tag" {
-  description = "Service tag de Azure usado en ip_restriction del site_config, para que el Function App solo acepte tráfico del gateway de APIM (nunca directo de Internet) — el function key es defensa en profundidad, no la única barrera."
-  type        = string
-  default     = "ApiManagement"
-}
 
 variable "sql_server_fqdn" {
   description = "FQDN del servidor Azure SQL (salida de data-sql), inyectado como app setting SqlServer__Fqdn."
