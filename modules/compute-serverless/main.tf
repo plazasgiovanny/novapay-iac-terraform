@@ -16,6 +16,27 @@
 # (ver envs/*/versions.tf), ya que azurerm_function_app_flex_consumption
 # no existe en versiones anteriores.
 
+# HALLAZGO REAL (smoke test tras activar wire_backend, 2026-08-16): el
+# service tag "ApiManagement" NO restringe de forma confiable el
+# tráfico de salida de un APIM en tier Consumption — confirmado contra
+# documentación oficial de Microsoft ("For API Management instances
+# created in service tiers that run on shared infrastructure
+# [Consumption, ...], the instance does not have a dedicated IP
+# address"; Service Tags "don't map to APIM's public IP ranges
+# properly" para restricciones de Function/App Service). Causó un 403
+# real bloqueando tráfico legítimo. Mitigación real recomendada por
+# Microsoft para este caso: acotar por el datacenter/región completo
+# (mucho más amplio que solo APIM, pero es la única opción real de
+# restricción por IP sin subir a un tier con VNet integration — mismo
+# tipo de trade-off ya aceptado en otras partes del proyecto, p.ej.
+# Service Bus Standard sin Private Link).
+locals {
+  # No hace falta enumerar los ~400 CIDR del tag: "AzureCloud.<region>"
+  # es un service tag válido de una sola entrada, Azure lo resuelve
+  # server-side.
+  outbound_service_tag = "AzureCloud.${var.location}"
+}
+
 resource "azurerm_service_plan" "this" {
   name                = "asp-novapay-serverless${var.instance_suffix}-${var.environment}"
   location            = var.location
@@ -93,20 +114,22 @@ resource "azurerm_function_app_flex_consumption" "this" {
   }
 
   # ip_restriction del sitio principal (tráfico de invocación real, el
-  # que atraviesa APIM) — DENY por defecto salvo el service tag de
-  # APIM. Deliberadamente NO se toca scm_ip_restriction aquí: el
-  # despliegue de código (ADR-02, zip deploy vía OIDC desde GitHub
-  # Actions) usa el endpoint SCM/Kudu, con IPs de runner dinámicas que
-  # no pertenecen a ningún service tag fijo — restringirlo también
-  # rompería el pipeline de despliegue de novapay-functions.
+  # que atraviesa APIM) — DENY por defecto salvo el datacenter/región
+  # completo (ver local.outbound_service_tag arriba: "ApiManagement" no
+  # sirve para esto en tier Consumption). Deliberadamente NO se toca
+  # scm_ip_restriction aquí: el despliegue de código (ADR-02, zip
+  # deploy vía OIDC desde GitHub Actions) usa el endpoint SCM/Kudu, con
+  # IPs de runner dinámicas que no pertenecen a ningún service tag fijo
+  # — restringirlo también rompería el pipeline de despliegue de
+  # novapay-functions.
   site_config {
     ip_restriction_default_action = "Deny"
 
     ip_restriction {
-      name        = "allow-apim"
+      name        = "allow-region"
       priority    = 100
       action      = "Allow"
-      service_tag = var.apim_service_tag
+      service_tag = local.outbound_service_tag
     }
   }
 

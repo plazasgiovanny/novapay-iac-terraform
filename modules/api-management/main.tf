@@ -11,8 +11,10 @@ resource "azurerm_api_management" "this" {
   publisher_email     = var.publisher_email
 
   # Consumption: sin costo base, sin integración VNet (limitación
-  # aceptada, mitigada con function key + restricción de IP a los
-  # rangos de salida de APIM Consumption).
+  # aceptada, mitigada con function key — la restricción de IP en el
+  # Function App es por región completa, no por APIM específicamente,
+  # ver modules/compute-serverless: "ApiManagement" como service_tag no
+  # funciona en este tier, hallazgo real documentado ahí).
   sku_name = "Consumption_0"
 
   tags = var.tags
