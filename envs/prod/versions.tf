@@ -29,5 +29,15 @@ provider "azurerm" {
     key_vault {
       purge_soft_delete_on_destroy = false
     }
+    # Sin esto, la regla $Default (TrueFilter) que Azure crea
+    # automáticamente al crear cada Subscription queda activa junto a la
+    # SqlFilter de sourceInstance que declara este repo (con nombre
+    # propio, no "$Default" — ver comentario en
+    # modules/messaging-servicebus/main.tf sobre el bug real encontrado
+    # al intentar gestionar un recurso llamado literalmente "$Default").
+    # Ambas actuando en OR anularía el aislamiento por instancia.
+    servicebus {
+      auto_delete_subscription_default_rule = true
+    }
   }
 }

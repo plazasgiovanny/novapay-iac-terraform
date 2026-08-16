@@ -74,15 +74,30 @@ resource "azurerm_servicebus_subscription" "func" {
   forward_dead_lettered_messages_to    = azurerm_servicebus_queue.dlq_landing[each.key].name
 }
 
-# Sobrescribe la regla $Default (TrueFilter por defecto) con un SqlFilter
-# sobre sourceInstance. Importante: se sobrescribe, no se agrega una
-# regla nueva junto a $Default — si $Default (TrueFilter) quedara
-# intacta junto a esta regla, ambas actuarían en OR y el filtro no
-# aislaría nada (cada Subscription recibiría igualmente todos los
-# mensajes).
+# Regla SqlFilter sobre sourceInstance, con nombre propio (no "$Default").
+#
+# HALLAZGO REAL (apply real, 2026-08-16): declarar este recurso con
+# name = "$Default" — para sobrescribir la regla que Azure crea
+# automáticamente al crear la Subscription — dispara un bug real y
+# 100% reproducible del provider azurerm 4.81.0 tanto en create como en
+# update: "Provider produced inconsistent result after apply: Root
+# object was present, but now absent". La causa más probable: esta
+# misma versión del provider (milestone confirmado,
+# hashicorp/terraform-provider-azurerm#32452) introdujo el feature flag
+# servicebus.auto_delete_subscription_default_rule, que borra la regla
+# $Default del lado de Azure justo después de crear la Subscription —
+# gestionar un recurso Terraform con ese mismo nombre reservado corre
+# contra esa carrera.
+#
+# Solución real: activar ese feature flag (envs/*/versions.tf) para que
+# Azure limpie la $Default automática, y declarar esta regla con un
+# nombre propio (nunca "$Default") — evita la colisión de raíz en vez
+# de pelear contra ella. Sigue siendo la única regla activa de la
+# Subscription (la automática ya no existe), así que el aislamiento por
+# sourceInstance queda igual de completo que con el diseño original.
 resource "azurerm_servicebus_subscription_rule" "func" {
   for_each        = local.instance_suffixes
-  name            = "$Default"
+  name            = "source-instance-filter"
   subscription_id = azurerm_servicebus_subscription.func[each.key].id
   filter_type     = "SqlFilter"
 
