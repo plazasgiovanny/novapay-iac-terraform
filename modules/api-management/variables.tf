@@ -38,6 +38,21 @@ variable "function_default_hostname" {
   type        = string
 }
 
+variable "function_app_canary_name" {
+  description = "Nombre del Function App candidato (salida de compute-serverless_canary), usado para leer sus host keys — ADR-03 U4."
+  type        = string
+}
+
+variable "function_app_canary_id" {
+  description = "ID del Function App candidato (salida de compute-serverless_canary). Se usa solo como disparador de dependencia (depends_on)."
+  type        = string
+}
+
+variable "function_canary_default_hostname" {
+  description = "Hostname público del Function App candidato, usado para construir la URL del segundo backend del Pool."
+  type        = string
+}
+
 variable "rate_limit_calls_per_minute" {
   description = "Límite de llamadas por minuto por subscription (protección ante abuso) — política 'rate-limit', la única disponible en el tier Consumption de APIM."
   type        = number

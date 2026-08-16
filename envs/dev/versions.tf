@@ -11,6 +11,13 @@ terraform {
       # se auditó el repo completo contra esa guía antes de subir la versión.
       version = "~> 4.21"
     }
+    # Ver envs/prod/versions.tf: solo para el backend tipo Pool de APIM
+    # (modules/api-management, ADR-03 U4) — azurerm_api_management_backend
+    # no soporta type="Pool" todavía.
+    azapi = {
+      source  = "Azure/azapi"
+      version = "~> 2.0"
+    }
   }
 
   # El estado vive en Azure Blob Storage, segmentado por ambiente. Los
@@ -37,4 +44,8 @@ provider "azurerm" {
       auto_delete_subscription_default_rule = true
     }
   }
+}
+
+provider "azapi" {
+  subscription_id = var.subscription_id
 }

@@ -190,15 +190,18 @@ module "compute_serverless_canary" {
 module "api_management" {
   source = "../../modules/api-management"
 
-  environment               = var.environment
-  location                  = var.location
-  resource_group_name       = azurerm_resource_group.this.name
-  publisher_name            = var.apim_publisher_name
-  publisher_email           = var.apim_publisher_email
-  function_app_name         = module.compute_serverless.function_app_name
-  function_app_id           = module.compute_serverless.function_app_id
-  function_default_hostname = module.compute_serverless.default_hostname
-  tags                      = local.common_tags
+  environment                      = var.environment
+  location                         = var.location
+  resource_group_name              = azurerm_resource_group.this.name
+  publisher_name                   = var.apim_publisher_name
+  publisher_email                  = var.apim_publisher_email
+  function_app_name                = module.compute_serverless.function_app_name
+  function_app_id                  = module.compute_serverless.function_app_id
+  function_default_hostname        = module.compute_serverless.default_hostname
+  function_app_canary_name         = module.compute_serverless_canary.function_app_name
+  function_app_canary_id           = module.compute_serverless_canary.function_app_id
+  function_canary_default_hostname = module.compute_serverless_canary.default_hostname
+  tags                             = local.common_tags
 }
 
 # Cada instancia física recibe Sender sobre el Topic completo (ambas

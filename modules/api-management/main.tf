@@ -80,6 +80,95 @@ resource "azurerm_api_management_backend" "func" {
   }
 }
 
+# Misma cadena que arriba, para la instancia candidata (ADR-03 U4) —
+# también gateada por wire_backend: su host key tampoco responde hasta
+# que exista código desplegado en func-novapay-pagos-canary-{env}.
+data "azurerm_function_app_host_keys" "pagos_canary" {
+  count               = var.wire_backend ? 1 : 0
+  name                = var.function_app_canary_name
+  resource_group_name = var.resource_group_name
+  depends_on          = [var.function_app_canary_id]
+}
+
+resource "azurerm_api_management_named_value" "func_canary_host_key" {
+  count               = var.wire_backend ? 1 : 0
+  name                = "func-novapay-pagos-canary-host-key"
+  resource_group_name = var.resource_group_name
+  api_management_name = azurerm_api_management.this.name
+  display_name        = "func-novapay-pagos-canary-host-key"
+  value               = data.azurerm_function_app_host_keys.pagos_canary[0].default_function_key
+  secret              = true
+}
+
+resource "azurerm_api_management_backend" "func_canary" {
+  count               = var.wire_backend ? 1 : 0
+  name                = "func-novapay-pagos-canary-backend"
+  resource_group_name = var.resource_group_name
+  api_management_name = azurerm_api_management.this.name
+  protocol            = "http"
+  url                 = "https://${var.function_canary_default_hostname}/api"
+
+  credentials {
+    header = {
+      "x-functions-key" = "{{${azurerm_api_management_named_value.func_canary_host_key[0].display_name}}}"
+    }
+  }
+}
+
+# Backend pool ponderado (ADR-03 U4) — decide qué instancia sirve
+# tráfico vigente y en qué proporción, sin jerarquía fija entre las dos.
+#
+# HALLAZGO REAL (verificado antes de codificar, no asumido):
+# azurerm_api_management_backend no soporta type="Pool" en ninguna
+# versión publicada del provider — issue abierto sin mergear,
+# hashicorp/terraform-provider-azurerm#30855, con un PR de la
+# comunidad esperando revisión desde hace meses. Es una funcionalidad
+# real de Azure (confirmada en el schema oficial de
+# Microsoft.ApiManagement/service/backends, BackendPoolItem con
+# "weight" 0-100), simplemente el provider azurerm no la expone
+# todavía. azapi (provider genérico de ARM, mismo mecanismo que otros
+# equipos usan como workaround mientras el PR no se mergea) gestiona
+# este recurso puntual llamando directo a la API — el resto del módulo
+# sigue en azurerm sin cambios.
+#
+# Pesos iniciales: 100/0 (toda la instancia estable, candidata en
+# reposo) — el mismo estado estacionario del diseño. lifecycle.ignore_changes
+# en "body" es deliberado: una vez creado, el job de CD (ADR-02) hace
+# PATCH directo sobre este recurso para mover pesos durante cada ciclo
+# de despliegue, fuera del control de Terraform — sin esto, cualquier
+# apply posterior revertiría la rampa en curso a los pesos iniciales.
+resource "azapi_resource" "backend_pool" {
+  count     = var.wire_backend ? 1 : 0
+  type      = "Microsoft.ApiManagement/service/backends@2024-05-01"
+  name      = "pool-novapay-pagos-${var.environment}"
+  parent_id = azurerm_api_management.this.id
+
+  body = {
+    properties = {
+      type        = "Pool"
+      description = "Pool ponderado estable/canary de func-novapay-pagos-${var.environment} — ADR-03 U4."
+      pool = {
+        services = [
+          {
+            id     = azurerm_api_management_backend.func[0].id
+            weight = 100
+          },
+          {
+            id     = azurerm_api_management_backend.func_canary[0].id
+            weight = 0
+          },
+        ]
+      }
+    }
+  }
+
+  schema_validation_enabled = false
+
+  lifecycle {
+    ignore_changes = [body]
+  }
+}
+
 # Política de la operación: enruta al backend real y aplica rate
 # limiting por subscription (protección ante abuso). "rate-limit" (no
 # "-by-key") es la única política de throttling disponible en el tier
@@ -90,11 +179,13 @@ resource "azurerm_api_management_backend" "func" {
 # counter-key. Cuota diaria por key queda fuera de alcance: no tiene
 # equivalente en Consumption (limitación real del SKU, no un olvido —
 # mismo criterio que Service Bus Standard sin Private Link).
-# También gateada por var.wire_backend: sin backend creado no hay
+# También gateada por var.wire_backend: sin el Pool creado no hay
 # backend-id válido que referenciar. Mientras tanto la operación queda
 # sin política propia (hereda el comportamiento por defecto de APIM,
 # sin ruta configurada) — aceptable en el bootstrap porque tampoco hay
-# código desplegado que pudiera responder.
+# código desplegado que pudiera responder. Enruta al Pool (no a un
+# backend individual): el Pool decide, según el peso vigente en cada
+# momento, cuál de las dos instancias físicas atiende cada solicitud.
 resource "azurerm_api_management_api_policy" "confirmaciones" {
   count               = var.wire_backend ? 1 : 0
   api_name            = azurerm_api_management_api.pagos.name
@@ -106,7 +197,7 @@ resource "azurerm_api_management_api_policy" "confirmaciones" {
   <inbound>
     <base />
     <rate-limit calls="${var.rate_limit_calls_per_minute}" renewal-period="60" />
-    <set-backend-service backend-id="${azurerm_api_management_backend.func[0].name}" />
+    <set-backend-service backend-id="${azapi_resource.backend_pool[0].name}" />
   </inbound>
   <backend>
     <base />
