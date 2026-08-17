@@ -21,4 +21,4 @@ Manual (Azure Data Studio / `sqlcmd` con autenticación AAD) o por el pipeline, 
 
 | Script | Contenido |
 |---|---|
-| `002_notificaciones_transaccionales.sql` | Propuesta de tabla `dbo.TransactionalNotifications` (fuera del alcance de este repositorio) + usuario contenido AAD de `func-novapay-pagos-{env}` y permisos mínimos (parte real de este repositorio). |
+| `002_notificaciones_transaccionales.sql` | Propuesta de tabla `dbo.TransactionalNotifications` (fuera del alcance de este repositorio) + usuario contenido AAD **por cada instancia** del Function App serverless (`func-novapay-pagos-{env}` y `-canary-{env}`, ADR-03 U4) y permisos mínimos (parte real de este repositorio). Usa `WITH SID` (no `FROM EXTERNAL PROVIDER`) — ver hallazgos reales dentro del script sobre por qué y sobre el Application ID vs Object ID. Solo se puede ejecutar desde dentro de la VNet (Private Endpoint); no hay bastion/jumpbox permanente, ver PLAN.md (act-4) §3.5 para el mecanismo real usado. |
