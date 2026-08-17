@@ -65,12 +65,14 @@ module "security_keyvault" {
 module "observability" {
   source = "../../modules/observability"
 
-  environment         = var.environment
-  location            = var.location
-  resource_group_name = azurerm_resource_group.this.name
-  retention_in_days   = var.retention_in_days
-  alert_email         = var.alert_email
-  tags                = local.common_tags
+  environment                       = var.environment
+  location                          = var.location
+  resource_group_name               = azurerm_resource_group.this.name
+  retention_in_days                 = var.retention_in_days
+  alert_email                       = var.alert_email
+  tags                              = local.common_tags
+  apim_backend_pool_id              = module.api_management.backend_pool_id
+  novapay_functions_sp_principal_id = var.novapay_functions_sp_principal_id
 
   monitored_resource_ids = {
     vnet              = module.networking.vnet_id

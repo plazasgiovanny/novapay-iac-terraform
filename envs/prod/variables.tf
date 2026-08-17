@@ -139,6 +139,13 @@ variable "servicebus_diagnostics_principal_id" {
   sensitive   = true
 }
 
+variable "novapay_functions_sp_principal_id" {
+  description = "Object ID del service principal sp-novapay-functions-{env} (app registration OIDC de novapay-functions, creada fuera de Terraform — Bloque 3.1). Recibe 'Monitoring Metrics Publisher' acotado a la Data Collection Rule del evento PesoActualizado (ADR-07 U4), para que el job de CD pueda emitir el evento de cambio de peso via Logs Ingestion API con la misma identidad OIDC que ya usa para desplegar. Vacío por defecto (nadie recibe el rol) — distinto del Object ID (principalId) de las managed identities de los Function Apps; este es el Object ID del service principal de la app registration."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 # --- Variables del flujo serverless ---
 
 variable "apim_publisher_name" {

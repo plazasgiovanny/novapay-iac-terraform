@@ -24,3 +24,18 @@ output "appinsights_instrumentation_key" {
   value       = azurerm_application_insights.this.instrumentation_key
   sensitive   = true
 }
+
+output "pesoactualizado_dce_logs_ingestion_endpoint" {
+  description = "URL de ingesta de logs del DCE (Bloque 2d, ADR-07 U4), consumida por el job de CD de novapay-functions para el POST del evento PesoActualizado."
+  value       = azurerm_monitor_data_collection_endpoint.pesoactualizado.logs_ingestion_endpoint
+}
+
+output "pesoactualizado_dcr_immutable_id" {
+  description = "Immutable ID de la DCR del evento PesoActualizado, requerido por la Logs Ingestion API (va en la URL del POST, no el nombre del recurso)."
+  value       = azurerm_monitor_data_collection_rule.pesoactualizado.immutable_id
+}
+
+output "pesoactualizado_stream_name" {
+  description = "Nombre del stream declarado en la DCR (Custom-PesoActualizado), requerido por la Logs Ingestion API — constante, expuesta como salida para que el job de CD no la hardcodee por separado."
+  value       = "Custom-PesoActualizado"
+}
