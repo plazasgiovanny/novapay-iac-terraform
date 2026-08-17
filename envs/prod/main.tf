@@ -105,20 +105,56 @@ module "data_sql" {
   tags                = local.common_tags
 }
 
-# Etapa 1 del Auto-Failover Group de SQL (ADR-06, Bloque 2e U4) — ver
-# modules/data-sql-secondary/README.md. Deliberadamente sin conexión al
-# resto del diseño todavía (sin Private Endpoint, sin failover group).
+# Auto-Failover Group de SQL (ADR-06, Bloque 2e U4) — ver
+# modules/data-sql-secondary/README.md para el detalle de las dos
+# etapas. Etapa 2 (Private Endpoint cross-región): data_subnet_id y
+# private_dns_zone_id son de la región PRIMARIA (reutiliza la
+# infraestructura de red y la zona DNS de modules/data_sql, no crea
+# ninguna nueva).
 module "data_sql_secondary" {
   source = "../../modules/data-sql-secondary"
 
   environment         = var.environment
   location            = var.sql_secondary_location
   resource_group_name = azurerm_resource_group.this.name
-  probe_sku_name      = var.sql_secondary_probe_sku_name
+  data_subnet_id      = module.networking.subnet_ids["datos"]
+  private_dns_zone_id = module.data_sql.private_dns_zone_id
   aad_admin_login     = var.aad_admin_login
   aad_admin_object_id = var.aad_admin_object_id
   tenant_id           = var.tenant_id
   tags                = local.common_tags
+}
+
+# El recurso que une los dos servidores (módulos data-sql y
+# data-sql-secondary) vive en la raíz, no en ninguno de los dos módulos
+# — mismo criterio que las asignaciones de rol que cruzan capa 1/capa 2
+# (ver comentario más abajo sobre security-keyvault/compute-appservice).
+# Política de failover MANUAL (ADR-06): el listener y la replicación
+# continua sí son automáticos, pero promover el secundario a primario
+# exige un comando explícito (az sql failover-group set-primary), nunca
+# un umbral automático — decisión deliberada para un flujo de pagos.
+resource "azurerm_mssql_failover_group" "core" {
+  name      = "fog-novapay-core-${var.environment}"
+  server_id = module.data_sql.server_id
+  databases = [module.data_sql.database_id]
+
+  partner_server {
+    id = module.data_sql_secondary.server_id
+  }
+
+  read_write_endpoint_failover_policy {
+    mode = "Manual"
+  }
+
+  tags = local.common_tags
+}
+
+# azurerm_mssql_failover_group no expone un atributo "fqdn"/listener
+# directamente (verificado contra el schema real del provider antes de
+# asumirlo) — el nombre del listener sigue una convención documentada
+# de Microsoft: "<nombre-del-failover-group>.database.windows.net".
+locals {
+  sql_failover_group_listener_fqdn = "${azurerm_mssql_failover_group.core.name}.database.windows.net"
 }
 
 module "compute_appservice" {
@@ -170,17 +206,20 @@ module "messaging_servicebus" {
 module "compute_serverless" {
   source = "../../modules/compute-serverless"
 
-  environment                   = var.environment
-  location                      = var.location
-  resource_group_name           = azurerm_resource_group.this.name
-  integracion_subnet_id         = module.networking.subnet_ids["integracion"]
-  max_instance_count            = var.serverless_max_instance_count
-  instance_suffix               = ""
-  storage_account_name          = "stnovapaypagos${var.environment}"
-  servicebus_namespace_fqdn     = module.messaging_servicebus.namespace_fqdn
-  servicebus_topic_name         = module.messaging_servicebus.topic_name
-  servicebus_subscription_name  = module.messaging_servicebus.subscription_names["estable"]
-  sql_server_fqdn               = module.data_sql.fully_qualified_domain_name
+  environment                  = var.environment
+  location                     = var.location
+  resource_group_name          = azurerm_resource_group.this.name
+  integracion_subnet_id        = module.networking.subnet_ids["integracion"]
+  max_instance_count           = var.serverless_max_instance_count
+  instance_suffix              = ""
+  storage_account_name         = "stnovapaypagos${var.environment}"
+  servicebus_namespace_fqdn    = module.messaging_servicebus.namespace_fqdn
+  servicebus_topic_name        = module.messaging_servicebus.topic_name
+  servicebus_subscription_name = module.messaging_servicebus.subscription_names["estable"]
+  # Listener del failover group (ADR-06), no el FQDN directo del
+  # servidor primario: la aplicación nunca necesita saber cuál lado
+  # está vigente ni reconfigurarse tras una conmutación.
+  sql_server_fqdn               = local.sql_failover_group_listener_fqdn
   sql_database_name             = module.data_sql.database_name
   appinsights_connection_string = module.observability.appinsights_connection_string
   tags                          = local.common_tags
@@ -195,17 +234,20 @@ module "compute_serverless" {
 module "compute_serverless_canary" {
   source = "../../modules/compute-serverless"
 
-  environment                   = var.environment
-  location                      = var.location
-  resource_group_name           = azurerm_resource_group.this.name
-  integracion_subnet_id         = module.networking.subnet_ids["integracion"]
-  max_instance_count            = var.serverless_max_instance_count
-  instance_suffix               = "-canary"
-  storage_account_name          = "stnpypagoscanary${var.environment}"
-  servicebus_namespace_fqdn     = module.messaging_servicebus.namespace_fqdn
-  servicebus_topic_name         = module.messaging_servicebus.topic_name
-  servicebus_subscription_name  = module.messaging_servicebus.subscription_names["canary"]
-  sql_server_fqdn               = module.data_sql.fully_qualified_domain_name
+  environment                  = var.environment
+  location                     = var.location
+  resource_group_name          = azurerm_resource_group.this.name
+  integracion_subnet_id        = module.networking.subnet_ids["integracion"]
+  max_instance_count           = var.serverless_max_instance_count
+  instance_suffix              = "-canary"
+  storage_account_name         = "stnpypagoscanary${var.environment}"
+  servicebus_namespace_fqdn    = module.messaging_servicebus.namespace_fqdn
+  servicebus_topic_name        = module.messaging_servicebus.topic_name
+  servicebus_subscription_name = module.messaging_servicebus.subscription_names["canary"]
+  # Listener del failover group (ADR-06), no el FQDN directo del
+  # servidor primario: la aplicación nunca necesita saber cuál lado
+  # está vigente ni reconfigurarse tras una conmutación.
+  sql_server_fqdn               = local.sql_failover_group_listener_fqdn
   sql_database_name             = module.data_sql.database_name
   appinsights_connection_string = module.observability.appinsights_connection_string
   tags                          = local.common_tags

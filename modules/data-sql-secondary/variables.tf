@@ -13,10 +13,14 @@ variable "resource_group_name" {
   type        = string
 }
 
-variable "probe_sku_name" {
-  description = "SKU DTU de la base de datos de prueba (Basic/S0-S3 — esta suscripción es Free Trial, ver HALLAZGO REAL en envs/prod/prod.tfvars). Deliberadamente el mínimo: esta base no sirve para nada más que confirmar aprovisionamiento."
+variable "data_subnet_id" {
+  description = "ID de la subred de datos de la región PRIMARIA (contrato recibido del módulo networking, mismo que usa modules/data-sql) — el Private Endpoint del servidor secundario vive ahí, no en una VNet nueva en la región secundaria (Azure SQL soporta Private Endpoint cross-región, verificado antes de asumirlo)."
   type        = string
-  default     = "Basic"
+}
+
+variable "private_dns_zone_id" {
+  description = "ID de la zona DNS privada privatelink.database.windows.net ya creada por modules/data-sql (salida private_dns_zone_id) — se reutiliza la MISMA zona, no una nueva, para que el listener del failover group resuelva correctamente hacia el lado vigente tras una conmutación."
+  type        = string
 }
 
 variable "aad_admin_login" {
