@@ -1,21 +1,20 @@
 # `data-sql-secondary`
 
-Etapa 1 del Auto-Failover Group de Azure SQL (ADR-06, Bloque 2e de la Fase 3 de U4). Aprovisiona **solo** un servidor lógico secundario + una base de datos vacía de SKU mínimo en una segunda región — deliberadamente aislado del resto: sin Private Endpoint, sin integración de red, sin replicación ni failover group todavía.
+Auto-Failover Group de Azure SQL (ADR-06, Bloque 2e de la Fase 3 de U4).
 
-## Por qué una etapa separada
+## Etapa 1 (completada 2026-08-17)
 
-Ninguna región distinta de `centralus` (la del servidor primario, `modules/data-sql`) tiene precedente empírico en esta suscripción. Ya se documentó que varias regiones (`eastus2`, `eastus`, `westus2`, `southcentralus`) bloquean Azure SQL por completo para esta suscripción ("Provisioning is restricted in this region"). Comprometerse de una vez al failover group completo (Etapa 2: `azurerm_mssql_failover_group` + Private Endpoint cross-región + reconfigurar `app_settings` en los 3 componentes) sin validar primero que la región elegida siquiera permite crear un servidor SQL sería construir sobre un supuesto no verificado.
+Servidor lógico secundario aislado (sin Private Endpoint, sin failover group), para validar con un recurso real si esta suscripción permite aprovisionar Azure SQL en una región distinta de `centralus` — ninguna otra región tenía precedente empírico. `northcentralus` resultó bloqueada (`ProvisioningDisabled`, mismo error que `eastus2`/`eastus`/`westus2`/`southcentralus`); `canadacentral` sí validó. La base de datos "probe" usada para esa validación ya cumplió su propósito y se eliminó en la Etapa 2.
 
-## Resultado posible
+## Etapa 2 (esta)
 
-- **Si el apply tiene éxito**: la región es viable, se procede con la Etapa 2 en un módulo/PR aparte.
-- **Si el apply falla** por restricción de región/cuota: se prueba la siguiente región candidata. Si ninguna funciona, se degrada a Active Geo-Replication simple sin Failover Group (alternativa ya descrita en ADR-06) — no bloquea el resto del checklist de Fase 3.
+- **Private Endpoint del servidor secundario**, en la subred de datos de la región **primaria** (centralus) — no hace falta una VNet nueva en `canadacentral`: Azure SQL Database soporta Private Endpoint cross-región (verificado contra la documentación oficial de Azure Private Link antes de asumirlo; Cosmos DB y Key Vault, por ejemplo, no lo soportan).
+- Registrado en la **misma** zona DNS privada (`privatelink.database.windows.net`) que ya usa el servidor primario (`modules/data-sql`, salida `private_dns_zone_id`) — no una zona nueva. Con ambos servidores en la misma zona, el registro DNS del listener del failover group se resuelve de forma privada hacia el lado que esté vigente en cada momento, sin que la aplicación necesite saber cuál es.
+- El recurso `azurerm_mssql_failover_group` en sí **no vive en este módulo** — une el servidor primario (`modules/data-sql`) con el secundario (este módulo), así que vive en la raíz del ambiente (`envs/{prod,dev}/main.tf`), mismo criterio ya usado para las asignaciones de rol que cruzan capas.
+- La réplica real de `sqldb-novapay-core-{env}` en el servidor secundario la crea y administra Azure automáticamente al configurar el failover group — no es un recurso Terraform aparte.
+- Política de failover **manual** (ADR-06): el listener y la replicación continua sí son automáticos, pero promover el secundario a primario exige una decisión y un comando explícitos, nunca un umbral automático.
+- Los 2 Function Apps de pagos (`compute-serverless`/`compute-serverless-canary`) se reconfiguran para conectarse al **listener** del failover group, no al FQDN del servidor primario directamente. `api-novapay-{env}` (`compute-appservice`) queda **fuera de este cambio**: no tiene ningún `app_settings`/secreto de Key Vault gestionado por Terraform para la conexión a SQL en este repositorio — su "cadena de conexión de infraestructura desde la Entrega 1" (ADR-06) es un artefacto heredado de una entrega anterior, fuera del alcance de este repositorio de infraestructura.
 
-## Historial real de regiones probadas
+## Costo real, no oculto
 
-- `northcentralus` — **descartada** (apply real fallido, 2026-08-17): `ProvisioningDisabled`, "Provisioning is restricted in this region" — mismo error que ya bloqueaba `eastus2`/`eastus`/`westus2`/`southcentralus` para el servidor primario.
-- `canadacentral` — candidata actual (`envs/prod/prod.tfvars`), sin probar todavía.
-
-## Limpieza si no se avanza a la Etapa 2
-
-Si la región valida pero por alguna razón no se continúa con la Etapa 2 en la misma sesión de trabajo, este módulo puede eliminarse de `envs/{prod,dev}/main.tf` sin dejar dependencias huérfanas — nada más en el diseño lo referencia todavía.
+A diferencia de la Etapa 1 (una base `Basic` mínima, ~US$5/mes), la réplica real que Azure crea para el failover group iguala el tier de la base primaria (`sql_sku_name`, `S3` en prod) — es un costo continuo real, no un experimento barato. Aceptado explícitamente en ADR-06 ("Negativas": costo adicional real de un segundo servidor/base de datos activo).

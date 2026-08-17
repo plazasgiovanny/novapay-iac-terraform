@@ -80,17 +80,13 @@ sql_zone_redundant  = false
 aad_admin_login     = "grp-novapay-dba"
 aad_admin_object_id = "00000000-0000-0000-0000-000000000001"
 
-# Etapa 1 del Auto-Failover Group de SQL (ADR-06, Bloque 2e U4,
-# modules/data-sql-secondary). HALLAZGO REAL (apply real fallido,
-# release v1.0.17, 2026-08-17): northcentralus también está bloqueada
-# para Azure SQL en esta suscripción — mismo error real que
-# eastus2/eastus/westus2/southcentralus (arriba): "ProvisioningDisabled
-# — Provisioning is restricted in this region". Se prueba ahora
-# canadacentral, la siguiente candidata documentada (ver
-# modules/data-sql-secondary/README.md); si también falla, se degrada a
-# Active Geo-Replication simple (ADR-06).
-sql_secondary_location       = "canadacentral"
-sql_secondary_probe_sku_name = "Basic"
+# Auto-Failover Group de SQL (ADR-06, Bloque 2e U4, modules/data-sql-secondary).
+# HALLAZGO REAL (apply real fallido, release v1.0.17, 2026-08-17):
+# northcentralus también está bloqueada para Azure SQL en esta
+# suscripción — mismo error real que eastus2/eastus/westus2/southcentralus
+# (arriba): "ProvisioningDisabled — Provisioning is restricted in this
+# region". canadacentral sí validó con un recurso real (Etapa 1).
+sql_secondary_location = "canadacentral"
 
 # HALLAZGO REAL (terraform apply contra Azure): esta suscripción tiene
 # cuota 0 para SKU Premium v3 (P1v3/P2v3) en todas las regiones probadas

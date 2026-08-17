@@ -103,20 +103,42 @@ module "data_sql" {
   tags                = local.common_tags
 }
 
-# Etapa 1 del Auto-Failover Group de SQL (ADR-06, Bloque 2e U4) — ver
-# modules/data-sql-secondary/README.md. Deliberadamente sin conexión al
-# resto del diseño todavía (sin Private Endpoint, sin failover group).
+# Auto-Failover Group de SQL (ADR-06, Bloque 2e U4) — ver
+# modules/data-sql-secondary/README.md y envs/prod/main.tf para el
+# detalle completo (dev nunca se ha aplicado realmente, backend roto,
+# espejado solo por consistencia).
 module "data_sql_secondary" {
   source = "../../modules/data-sql-secondary"
 
   environment         = var.environment
   location            = var.sql_secondary_location
   resource_group_name = azurerm_resource_group.this.name
-  probe_sku_name      = var.sql_secondary_probe_sku_name
+  data_subnet_id      = module.networking.subnet_ids["datos"]
+  private_dns_zone_id = module.data_sql.private_dns_zone_id
   aad_admin_login     = var.aad_admin_login
   aad_admin_object_id = var.aad_admin_object_id
   tenant_id           = var.tenant_id
   tags                = local.common_tags
+}
+
+resource "azurerm_mssql_failover_group" "core" {
+  name      = "fog-novapay-core-${var.environment}"
+  server_id = module.data_sql.server_id
+  databases = [module.data_sql.database_id]
+
+  partner_server {
+    id = module.data_sql_secondary.server_id
+  }
+
+  read_write_endpoint_failover_policy {
+    mode = "Manual"
+  }
+
+  tags = local.common_tags
+}
+
+locals {
+  sql_failover_group_listener_fqdn = "${azurerm_mssql_failover_group.core.name}.database.windows.net"
 }
 
 module "compute_appservice" {
@@ -178,7 +200,7 @@ module "compute_serverless" {
   servicebus_namespace_fqdn     = module.messaging_servicebus.namespace_fqdn
   servicebus_topic_name         = module.messaging_servicebus.topic_name
   servicebus_subscription_name  = module.messaging_servicebus.subscription_names["estable"]
-  sql_server_fqdn               = module.data_sql.fully_qualified_domain_name
+  sql_server_fqdn               = local.sql_failover_group_listener_fqdn
   sql_database_name             = module.data_sql.database_name
   appinsights_connection_string = module.observability.appinsights_connection_string
   tags                          = local.common_tags
@@ -197,7 +219,7 @@ module "compute_serverless_canary" {
   servicebus_namespace_fqdn     = module.messaging_servicebus.namespace_fqdn
   servicebus_topic_name         = module.messaging_servicebus.topic_name
   servicebus_subscription_name  = module.messaging_servicebus.subscription_names["canary"]
-  sql_server_fqdn               = module.data_sql.fully_qualified_domain_name
+  sql_server_fqdn               = local.sql_failover_group_listener_fqdn
   sql_database_name             = module.data_sql.database_name
   appinsights_connection_string = module.observability.appinsights_connection_string
   tags                          = local.common_tags

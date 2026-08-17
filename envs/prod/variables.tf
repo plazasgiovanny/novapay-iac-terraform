@@ -67,14 +67,8 @@ variable "sql_zone_redundant" {
 }
 
 variable "sql_secondary_location" {
-  description = "Región del servidor SQL secundario (Etapa 1 del Auto-Failover Group, ADR-06 U4) — distinta de var.location, sin precedente empírico en esta suscripción todavía."
+  description = "Región del servidor SQL secundario del Auto-Failover Group (ADR-06 U4) — distinta de var.location. northcentralus resultó bloqueada para Azure SQL en esta suscripción; canadacentral validó con un recurso real (Etapa 1, 2026-08-17)."
   type        = string
-}
-
-variable "sql_secondary_probe_sku_name" {
-  description = "SKU DTU mínimo de la base de datos de prueba en la región secundaria (Free Trial: solo Basic/S0-S3)."
-  type        = string
-  default     = "Basic"
 }
 
 variable "aad_admin_login" {

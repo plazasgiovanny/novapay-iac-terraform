@@ -1,9 +1,9 @@
 output "server_id" {
-  description = "ID del servidor SQL secundario. Consumido en la Etapa 2 (failover group) — no usado en esta etapa."
+  description = "ID del servidor SQL secundario, consumido por el Auto-Failover Group (partner_server, envs/{prod,dev}/main.tf)."
   value       = azurerm_mssql_server.secondary.id
 }
 
 output "server_name" {
-  description = "Nombre del servidor SQL secundario, requerido por azurerm_mssql_failover_group en la Etapa 2."
+  description = "Nombre del servidor SQL secundario."
   value       = azurerm_mssql_server.secondary.name
 }
