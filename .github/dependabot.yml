@@ -1,0 +1,30 @@
+version: 2
+
+# Bloque 3.3 (DevSecOps, ADR-08): mantiene al día los providers/modules de
+# Terraform (fijados en .terraform.lock.hcl) y las GitHub Actions de terceros
+# (fijadas por SHA en los workflows). Dependabot solo ABRE el PR con la
+# actualización — nunca hace merge automático, eso lo revisa y aprueba un
+# humano igual que cualquier otro cambio de este repo.
+updates:
+  # Cada raíz de Terraform con su propio .terraform.lock.hcl necesita una
+  # entrada independiente: Dependabot no descubre lock files anidados desde
+  # un solo directorio.
+  - package-ecosystem: "terraform"
+    directory: "/envs/prod"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "terraform"
+    directory: "/envs/dev"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  # directory "/" detecta automáticamente todos los .github/workflows/*.yml
+  # del repo (terraform-ci.yml, terraform-cd.yml y los que se agreguen).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
