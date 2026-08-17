@@ -9,7 +9,7 @@ terraform {
       # solo existe desde esa versión. El salto de 3.110 a 4.x trae cambios
       # incompatibles documentados en la guía oficial de migración de HashiCorp;
       # se auditó el repo completo contra esa guía antes de subir la versión.
-      version = "~> 4.21"
+      version = "~> 5.1"
     }
     # Ver envs/prod/versions.tf: solo para el backend tipo Pool de APIM
     # (modules/api-management, ADR-03 U4) — azurerm_api_management_backend
