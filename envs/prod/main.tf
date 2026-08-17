@@ -116,6 +116,7 @@ module "data_sql_secondary" {
 
   environment         = var.environment
   location            = var.sql_secondary_location
+  primary_location    = var.location
   resource_group_name = azurerm_resource_group.this.name
   data_subnet_id      = module.networking.subnet_ids["datos"]
   private_dns_zone_id = module.data_sql.private_dns_zone_id
