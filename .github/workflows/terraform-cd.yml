@@ -104,7 +104,17 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: tfplan-prod-${{ github.run_id }}
-          path: envs/prod/tfplan
+          # El paquete de rollback-canary (modules/rollback-canary/.build/*.zip,
+          # generado por "data archive_file" al calcular el plan) también
+          # tiene que viajar al job de "apply" — corre en un runner distinto,
+          # con un filesystem distinto: sin esto, "terraform apply tfplan"
+          # falla con "no such file or directory" al intentar subir el blob,
+          # porque el archivo local que el plan referenció nunca llegó a
+          # existir en ese runner (confirmado con un apply real fallido,
+          # release v1.0.23, 2026-08-17 — ver PLAN.md).
+          path: |
+            envs/prod/tfplan
+            modules/rollback-canary/.build/
           retention-days: 3
 
   apply:
@@ -138,10 +148,14 @@ jobs:
       - name: terraform init
         run: terraform init -backend-config=backend.hcl
 
+      # path "." (raíz del repo, no "envs/prod"): el artefacto ahora trae
+      # dos rutas relativas distintas (envs/prod/tfplan y
+      # modules/rollback-canary/.build/), hay que restaurar ambas en su
+      # ubicación original, no aplanarlas dentro de envs/prod.
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: tfplan-prod-${{ github.run_id }}
-          path: envs/prod
+          path: .
 
       - name: terraform apply
         run: terraform apply -input=false tfplan

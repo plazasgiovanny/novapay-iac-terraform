@@ -1,6 +1,6 @@
 output "function_app_id" {
   description = "ID del Function App de rollback-canary, consumido por observability (diagnostic settings)."
-  value       = azurerm_linux_function_app.this.id
+  value       = azurerm_windows_function_app.this.id
 }
 
 output "action_group_id" {
