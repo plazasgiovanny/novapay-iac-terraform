@@ -17,7 +17,7 @@ terraform {
       # previa). Revertido a 4.21 para volver a espejar envs/prod
       # (que sigue en 4.21, nunca se tocó) — dev sin esto queda
       # divergente del ambiente real sin ninguna razón funcional.
-      version = "~> 4.21"
+      version = "~> 5.1"
     }
     # Ver envs/prod/versions.tf: solo para el backend tipo Pool de APIM
     # (modules/api-management, ADR-03 U4) — azurerm_api_management_backend
