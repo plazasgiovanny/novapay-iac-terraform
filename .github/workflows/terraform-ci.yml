@@ -21,6 +21,26 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Bloque 3.3 (DevSecOps, ADR-08): escaneo estático de seguridad con tfsec
+  # sobre todo el árbol de Terraform (modules/, envs/, policies/). Va como
+  # job separado, no como step dentro de "plan": no necesita login en Azure
+  # ni terraform init, así que corre en paralelo y no depende de que fmt/
+  # validate/plan pasen. soft_fail:true = solo anota hallazgos en el log del
+  # job, nunca lo pone en rojo ni bloquea el PR — la barrera dura sigue
+  # siendo la revisión humana del plan.
+  tfsec:
+    name: tfsec (no bloqueante)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: aquasecurity/tfsec-action@b466648d6e39e7c75324f25d83891162a721f2d6 # v1.0.3
+        with:
+          soft_fail: true
+
   plan:
     runs-on: ubuntu-latest
     timeout-minutes: 15
