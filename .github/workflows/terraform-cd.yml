@@ -104,7 +104,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: tfplan-prod-${{ github.run_id }}
-          # El paquete de rollback-canary (modules/rollback-canary/.build/*.zip,
+          # El paquete de rollback-canary (modules/rollback-canary/build/*.zip,
           # generado por "data archive_file" al calcular el plan) también
           # tiene que viajar al job de "apply" — corre en un runner distinto,
           # con un filesystem distinto: sin esto, "terraform apply tfplan"
@@ -112,9 +112,27 @@ jobs:
           # porque el archivo local que el plan referenció nunca llegó a
           # existir en ese runner (confirmado con un apply real fallido,
           # release v1.0.23, 2026-08-17 — ver PLAN.md).
+          #
+          # HALLAZGO REAL #2 (apply real fallido, release v1.0.24,
+          # 2026-08-17): el primer intento de este fix usaba
+          # "modules/rollback-canary/.build/" (con punto) — actions/upload-artifact
+          # excluye archivos y carpetas ocultos (prefijo ".") por
+          # defecto desde sep-2024, así que el zip nunca llegaba al
+          # artefacto pese a estar listado explícitamente (confirmado
+          # en el log del job: "With the provided path, there will be
+          # 1 file uploaded" — solo tfplan). Verificado que NO es una
+          # diferencia de versión de Terraform: reproducido en local
+          # con la versión exacta de CI (1.9.8) y con una más nueva
+          # (1.15.8), el archivo se escribe igual en ambos casos — el
+          # problema es 100% de upload-artifact, no de Terraform.
+          # Fix real: renombrar el directorio de salida a "build/" (sin
+          # punto) en modules/rollback-canary/main.tf, en vez de
+          # agregar la opción "include-hidden-files: true" — elimina la
+          # trampa de raíz para cualquier futuro cambio en este módulo,
+          # no solo la sortea puntualmente aquí.
           path: |
             envs/prod/tfplan
-            modules/rollback-canary/.build/
+            modules/rollback-canary/build/
           retention-days: 3
 
   apply:
@@ -150,7 +168,7 @@ jobs:
 
       # path "." (raíz del repo, no "envs/prod"): el artefacto ahora trae
       # dos rutas relativas distintas (envs/prod/tfplan y
-      # modules/rollback-canary/.build/), hay que restaurar ambas en su
+      # modules/rollback-canary/build/), hay que restaurar ambas en su
       # ubicación original, no aplanarlas dentro de envs/prod.
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
