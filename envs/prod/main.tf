@@ -229,6 +229,26 @@ module "api_management" {
   tags                             = local.common_tags
 }
 
+# Bloque 2g U4 (ADR-03 §2.6) — ver modules/rollback-canary/README.md.
+# Red de seguridad asíncrona, independiente del job de CD.
+module "rollback_canary" {
+  source = "../../modules/rollback-canary"
+
+  environment               = var.environment
+  location                  = var.location
+  resource_group_name       = azurerm_resource_group.this.name
+  subscription_id           = var.subscription_id
+  apim_name                 = "apim-novapay-${var.environment}"
+  backend_pool_name         = "pool-novapay-pagos-${var.environment}"
+  apim_id                   = module.api_management.id
+  action_group_alert_scopes = [module.observability.log_analytics_workspace_id]
+  role_names_in_ramp = [
+    "func-novapay-pagos-${var.environment}",
+    "func-novapay-pagos-canary-${var.environment}",
+  ]
+  tags = local.common_tags
+}
+
 # Cada instancia física recibe Sender sobre el Topic completo (ambas
 # publican al mismo Topic) pero Receiver únicamente sobre su propia
 # Subscription — nunca la del otro slot. Refuerza a nivel de RBAC el

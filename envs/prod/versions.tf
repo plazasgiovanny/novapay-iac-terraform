@@ -22,6 +22,15 @@ terraform {
       source  = "Azure/azapi"
       version = "~> 2.0"
     }
+    # Solo para empaquetar el código embebido del Function App de
+    # rollback-canary (modules/rollback-canary, Bloque 2g U4) — ver
+    # comentario en ese módulo sobre por qué el código vive en este
+    # repo (no en un repo/pipeline propio) y se despliega vía
+    # WEBSITE_RUN_FROM_PACKAGE en el mismo apply, no vía CD externo.
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.4"
+    }
   }
 
   # El estado vive en Azure Blob Storage, segmentado por ambiente. Los
