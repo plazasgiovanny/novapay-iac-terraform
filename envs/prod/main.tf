@@ -103,6 +103,22 @@ module "data_sql" {
   tags                = local.common_tags
 }
 
+# Etapa 1 del Auto-Failover Group de SQL (ADR-06, Bloque 2e U4) — ver
+# modules/data-sql-secondary/README.md. Deliberadamente sin conexión al
+# resto del diseño todavía (sin Private Endpoint, sin failover group).
+module "data_sql_secondary" {
+  source = "../../modules/data-sql-secondary"
+
+  environment         = var.environment
+  location            = var.sql_secondary_location
+  resource_group_name = azurerm_resource_group.this.name
+  probe_sku_name      = var.sql_secondary_probe_sku_name
+  aad_admin_login     = var.aad_admin_login
+  aad_admin_object_id = var.aad_admin_object_id
+  tenant_id           = var.tenant_id
+  tags                = local.common_tags
+}
+
 module "compute_appservice" {
   source = "../../modules/compute-appservice"
 

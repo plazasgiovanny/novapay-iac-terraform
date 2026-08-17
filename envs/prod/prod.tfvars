@@ -80,6 +80,17 @@ sql_zone_redundant  = false
 aad_admin_login     = "grp-novapay-dba"
 aad_admin_object_id = "00000000-0000-0000-0000-000000000001"
 
+# Etapa 1 del Auto-Failover Group de SQL (ADR-06, Bloque 2e U4,
+# modules/data-sql-secondary): región candidata sin precedente empírico
+# en esta suscripción todavía — a diferencia de eastus2/eastus/westus2/
+# southcentralus (ya confirmados bloqueados, ver arriba), northcentralus
+# nunca se ha probado con un recurso real. Si el "apply" de este módulo
+# falla por restricción de región/cuota, la siguiente candidata es
+# canadacentral (ver modules/data-sql-secondary/README.md); si ninguna
+# funciona, se degrada a Active Geo-Replication simple (ADR-06).
+sql_secondary_location       = "northcentralus"
+sql_secondary_probe_sku_name = "Basic"
+
 # HALLAZGO REAL (terraform apply contra Azure): esta suscripción tiene
 # cuota 0 para SKU Premium v3 (P1v3/P2v3) en todas las regiones probadas
 # (eastus2 y centralus) — "Current Limit (PremiumV3 VMs): 0". Se usa

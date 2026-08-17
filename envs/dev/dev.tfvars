@@ -65,6 +65,13 @@ sql_zone_redundant  = false
 aad_admin_login     = "grp-novapay-dba"
 aad_admin_object_id = "00000000-0000-0000-0000-000000000001"
 
+# Ver comentario detallado en envs/prod/prod.tfvars. Sin efecto práctico
+# hoy: el backend de dev está roto (stnovapaytfstatedev no existe, dev
+# fuera de alcance de esta fase) — se agrega solo por consistencia con
+# el resto del checklist de Bloque 2, que también se espeja aquí.
+sql_secondary_location       = "northcentralus"
+sql_secondary_probe_sku_name = "Basic"
+
 appservice_sku_name      = "P1v3"
 appservice_worker_count  = 1
 appservice_autoscale_min = 1
