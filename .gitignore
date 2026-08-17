@@ -39,8 +39,10 @@ plan_output.txt
 # Paquete zip generado por "data archive_file" al empaquetar el código
 # embebido de rollback-canary (modules/rollback-canary, Bloque 2g U4) —
 # artefacto de build local/CI, regenerado en cada "terraform plan"/"apply"
-# a partir de function-src/, nunca la fuente de verdad.
-modules/rollback-canary/.build/
+# a partir de function-src/, nunca la fuente de verdad. Deliberadamente
+# "build/" y no ".build/": actions/upload-artifact excluye carpetas
+# ocultas (prefijo ".") por defecto, ver modules/rollback-canary/main.tf.
+modules/rollback-canary/build/
 
 # Proyecto .NET de las Azure Functions (functions/NovaPay.Payments).
 # local.settings.json es config de desarrollo local (nombres de

@@ -23,9 +23,17 @@
 # de PowerShell que rara vez cambian.
 
 data "archive_file" "rollback_canary" {
-  type        = "zip"
-  source_dir  = "${path.module}/function-src"
-  output_path = "${path.module}/.build/rollback-canary-${var.environment}.zip"
+  type       = "zip"
+  source_dir = "${path.module}/function-src"
+  # "build/", no ".build/": actions/upload-artifact excluye archivos y
+  # carpetas ocultos (prefijo ".") por defecto desde sep-2024 — el
+  # zip nunca llegaba al artefacto de CI aunque se listara explícitamente
+  # en su "path" (confirmado con un apply real fallido, release
+  # v1.0.23/v1.0.24, 2026-08-17: solo "1 file uploaded", nunca el zip;
+  # verificado también que no es una diferencia de versión de Terraform
+  # — reproducido con la versión exacta de CI, 1.9.8, el archivo se
+  # escribe igual en disco local en ambos casos).
+  output_path = "${path.module}/build/rollback-canary-${var.environment}.zip"
 }
 
 # Cuenta de almacenamiento dedicada — mismo criterio que
