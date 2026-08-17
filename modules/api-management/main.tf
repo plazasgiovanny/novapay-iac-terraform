@@ -171,6 +171,26 @@ resource "azapi_resource" "backend_pool" {
   }
 }
 
+# Secreto real (24 bytes aleatorios, generado una vez y persistido en
+# el state — no un valor legible/adivinable) que gatea la ruta directa
+# de verificación de la policy de abajo. Nunca en texto plano en
+# ningún archivo versionado: se consume vía terraform output (sensible)
+# y se configura como secret de GitHub en novapay-functions, igual que
+# el resto de secretos ya manejados así en este proyecto (DCE/DCR de
+# PesoActualizado, etc.).
+resource "random_id" "verify_key" {
+  byte_length = 24
+}
+
+resource "azurerm_api_management_named_value" "verify_key" {
+  name                = "novapay-verify-key"
+  resource_group_name = var.resource_group_name
+  api_management_name = azurerm_api_management.this.name
+  display_name        = "novapay-verify-key"
+  value               = random_id.verify_key.hex
+  secret              = true
+}
+
 # Política de la operación: enruta al backend real y aplica rate
 # limiting por subscription (protección ante abuso). "rate-limit" (no
 # "-by-key") es la única política de throttling disponible en el tier
@@ -188,6 +208,25 @@ resource "azapi_resource" "backend_pool" {
 # código desplegado que pudiera responder. Enruta al Pool (no a un
 # backend individual): el Pool decide, según el peso vigente en cada
 # momento, cuál de las dos instancias físicas atiende cada solicitud.
+#
+# HALLAZGO REAL (primer run real de cd.yml a través del pipeline
+# normal, novapay-functions, 2026-08-17 — nunca antes ejercitado:
+# bootstrap-deploy.yml, el único camino usado hasta ahora, no tiene
+# ningún paso de verificación): "Verificación post-despliegue vía
+# Application Insights" espera tráfico real en la instancia recién
+# desplegada, pero esa instancia SIEMPRE está al 0% de peso justo
+# después del deploy (es, por definición, la que se va a promover) —
+# con weight=0 el Pool nunca la selecciona para tráfico público.
+# Confirmado empíricamente: 10 solicitudes reales vía el generador de
+# carga, 0 llegaron a la instancia en 0%. La verificación, tal como
+# estaba diseñada, no podía pasar nunca. Fix real: una ruta directa
+# condicional que bypassa el Pool SOLO para verificación — gateada por
+# un header secreto (Named Value, nunca en texto plano) y un segundo
+# header cuyo valor debe ser exactamente uno de los dos backend-id
+# reales (evita poder enrutar a un backend arbitrario). El tráfico
+# normal (sin esos headers) sigue yendo al Pool sin cambios. Sigue
+# pasando por ip_restriction porque el origen real de la solicitud
+# sigue siendo APIM (mismo service tag ya permitido, AzureCloud.<region>).
 resource "azurerm_api_management_api_policy" "confirmaciones" {
   count               = var.wire_backend ? 1 : 0
   api_name            = azurerm_api_management_api.pagos.name
@@ -199,7 +238,14 @@ resource "azurerm_api_management_api_policy" "confirmaciones" {
   <inbound>
     <base />
     <rate-limit calls="${var.rate_limit_calls_per_minute}" renewal-period="60" />
-    <set-backend-service backend-id="${azapi_resource.backend_pool[0].name}" />
+    <choose>
+      <when condition="@(context.Request.Headers.GetValueOrDefault("X-Novapay-Verify-Key","") == "{{${azurerm_api_management_named_value.verify_key.display_name}}}" &amp;&amp; (context.Request.Headers.GetValueOrDefault("X-Novapay-Verify-Target","") == "${azurerm_api_management_backend.func[0].name}" || context.Request.Headers.GetValueOrDefault("X-Novapay-Verify-Target","") == "${azurerm_api_management_backend.func_canary[0].name}"))">
+        <set-backend-service backend-id="@(context.Request.Headers.GetValueOrDefault("X-Novapay-Verify-Target",""))" />
+      </when>
+      <otherwise>
+        <set-backend-service backend-id="${azapi_resource.backend_pool[0].name}" />
+      </otherwise>
+    </choose>
   </inbound>
   <backend>
     <base />

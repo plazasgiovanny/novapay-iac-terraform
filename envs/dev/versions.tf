@@ -32,6 +32,12 @@ terraform {
       source  = "hashicorp/archive"
       version = "~> 2.4"
     }
+    # Ver envs/prod/versions.tf: solo para el secreto que gatea la ruta
+    # directa de verificación post-despliegue en modules/api-management.
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
 
   # El estado vive en Azure Blob Storage, segmentado por ambiente. Los
