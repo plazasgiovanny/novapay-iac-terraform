@@ -19,7 +19,7 @@
       },
       {
         "not": {
-          "field": "Microsoft.Web/sites/config/web.ipSecurityRestrictionsDefaultAction",
+          "field": "Microsoft.Web/sites/config/ipSecurityRestrictionsDefaultAction",
           "equals": "Deny"
         }
       }

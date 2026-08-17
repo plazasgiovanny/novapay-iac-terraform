@@ -71,6 +71,24 @@ resource "azurerm_policy_definition" "require_tags" {
 # en vez de file() (interpola var.environment) + dos condiciones "like"
 # en "anyOf", una por cada Function App de pagos, cada una con un solo
 # wildcard al inicio — ver policies/require-ip-restriction.json.tpl.
+#
+# HALLAZGO REAL #3 (apply real fallido, release v1.0.19, 2026-08-17):
+# el fix del HALLAZGO REAL anterior seguía fallando, ahora con 400
+# InvalidPolicyAlias — el propio error de Azure trae la lista completa
+# de alias soportados para el tipo "Microsoft.Web/sites/config" y
+# confirma que "Microsoft.Web/sites/config/web.ipSecurityRestrictionsDefaultAction"
+# NO es uno de ellos (el prefijo "web." sí existe para las propiedades
+# del array, p.ej. "config/web.ipSecurityRestrictions[*].action", pero
+# NO para la propiedad "DefaultAction" — inconsistencia real de
+# nomenclatura de Microsoft, no un error nuestro). El alias correcto,
+# tomado literalmente de esa misma lista, es
+# "Microsoft.Web/sites/config/ipSecurityRestrictionsDefaultAction" (sin
+# "web."). La verificación anterior contra el dump genérico de aliases
+# del provider (`az rest .../providers/Microsoft.Web?$expand=resourceTypes/aliases`)
+# no bastó: ese dump no distingue qué alias es válido para cada
+# resourceType específico ("sites" vs "sites/config") — la fuente de
+# verdad real es el propio mensaje de error del API de
+# CreateOrUpdate de la definición de política, no el dump genérico.
 resource "azurerm_policy_definition" "require_ip_restriction" {
   name         = "novapay-require-ip-restriction-${var.environment}"
   policy_type  = "Custom"
