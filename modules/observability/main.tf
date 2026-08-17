@@ -294,7 +294,7 @@ locals {
       type = 3
       content = {
         version                 = "KqlItem/1.0"
-        query                   = "AppRequests\n| where AppRoleName == \"func-novapay-pagos\"\n| summarize p95=percentile(DurationMs, 95), p99=percentile(DurationMs, 99) by AppRoleInstance, bin(TimeGenerated, 5m)"
+        query                   = "AppRequests\n| where AppRoleName in (\"func-novapay-pagos-${var.environment}\", \"func-novapay-pagos-canary-${var.environment}\")\n| summarize p95=percentile(DurationMs, 95), p99=percentile(DurationMs, 99) by AppRoleName, bin(TimeGenerated, 5m)"
         size                    = 0
         queryType               = 0
         resourceType            = "microsoft.operationalinsights/workspaces"
@@ -308,7 +308,7 @@ locals {
       type = 3
       content = {
         version                 = "KqlItem/1.0"
-        query                   = "AppRequests\n| where AppRoleName == \"func-novapay-pagos\"\n| summarize total=count(), errores=countif(toint(ResultCode) >= 500) by AppRoleInstance, bin(TimeGenerated, 5m)\n| extend tasaError = errores * 100.0 / total\n| project TimeGenerated, AppRoleInstance, tasaError"
+        query                   = "AppRequests\n| where AppRoleName in (\"func-novapay-pagos-${var.environment}\", \"func-novapay-pagos-canary-${var.environment}\")\n| summarize total=count(), errores=countif(toint(ResultCode) >= 500) by AppRoleName, bin(TimeGenerated, 5m)\n| extend tasaError = errores * 100.0 / total\n| project TimeGenerated, AppRoleName, tasaError"
         size                    = 0
         queryType               = 0
         resourceType            = "microsoft.operationalinsights/workspaces"
