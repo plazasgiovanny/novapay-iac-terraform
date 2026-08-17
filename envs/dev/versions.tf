@@ -9,7 +9,15 @@ terraform {
       # solo existe desde esa versión. El salto de 3.110 a 4.x trae cambios
       # incompatibles documentados en la guía oficial de migración de HashiCorp;
       # se auditó el repo completo contra esa guía antes de subir la versión.
-      version = "~> 5.1"
+      #
+      # HALLAZGO REAL (2026-08-17): Dependabot abrió y se mergeó un PR
+      # subiendo esto a "~> 5.1" (salto de versión MAYOR, sin auditar
+      # contra la guía de migración de HashiCorp — mismo tipo de riesgo
+      # ya reconocido para el salto 3.x→4.x, esta vez sin la revisión
+      # previa). Revertido a 4.21 para volver a espejar envs/prod
+      # (que sigue en 4.21, nunca se tocó) — dev sin esto queda
+      # divergente del ambiente real sin ninguna razón funcional.
+      version = "~> 4.21"
     }
     # Ver envs/prod/versions.tf: solo para el backend tipo Pool de APIM
     # (modules/api-management, ADR-03 U4) — azurerm_api_management_backend
