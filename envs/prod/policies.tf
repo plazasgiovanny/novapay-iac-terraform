@@ -34,16 +34,37 @@ resource "azurerm_policy_definition" "require_tags" {
 # bloqueado en el primer "terraform apply", una regresión real, no una
 # mejora de seguridad. Solo los 2 Function Apps del flujo de pagos
 # (ADR-03 U4) llevan ip_restriction (ver modules/compute-serverless).
+#
+# HALLAZGO REAL (apply real fallido, release v1.0.17, 2026-08-17): la
+# primera versión de esta política apuntaba a "type = Microsoft.Web/sites"
+# (el recurso raíz) y terminó bloqueando una actualización legítima y no
+# relacionada de ambos Function Apps de pagos con
+# RequestDisallowedByPolicy — el PUT/PATCH que el provider azurerm envía
+# contra el recurso raíz para cambios que no tocan ip_restriction (p.ej.
+# app_settings) no incluye el campo siteConfig.ipSecurityRestrictionsDefaultAction
+# en ese payload puntual, así que la política lo evaluaba como "ausente"
+# y denegaba cualquier escritura, no solo la que de verdad quitaría la
+# restricción. Mismo síntoma documentado por la comunidad en
+# https://github.com/Azure/azure-policy/issues/682 (evaluación de
+# alias siteConfig.* contra Microsoft.Web/sites no es confiable, ni para
+# Deny en escritura ni para el compliance scan). Fix real (mismo patrón
+# de la solución aceptada en ese issue): apuntar al sub-recurso real que
+# sí carga el body completo de ip_restriction en cada escritura —
+# "Microsoft.Web/sites/config" con nombre "web" — filtrado por el ID
+# completo (no por "name", que en un sub-recurso solo trae el segmento
+# hijo "web", no el sitio padre). Requiere mode = "All": "Indexed" solo
+# evalúa tipos que soportan tags/location, y este sub-recurso no los
+# soporta directamente (hereda del sitio padre).
 # Alias ARM verificado contra la API real (no asumido):
 # `az rest --method get --uri "https://management.azure.com/providers/Microsoft.Web?api-version=2021-04-01&$expand=resourceTypes/aliases"`
-# confirma "Microsoft.Web/sites/siteConfig.ipSecurityRestrictionsDefaultAction"
+# confirma "Microsoft.Web/sites/config/web.ipSecurityRestrictionsDefaultAction"
 # como alias válido para Azure Policy.
 resource "azurerm_policy_definition" "require_ip_restriction" {
   name         = "novapay-require-ip-restriction-${var.environment}"
   policy_type  = "Custom"
-  mode         = "Indexed"
+  mode         = "All"
   display_name = "NovaPay - Exigir ip_restriction en Function Apps de pagos"
-  description  = "Impide crear o actualizar func-novapay-pagos-{env}/func-novapay-pagos-canary-{env} sin ipSecurityRestrictionsDefaultAction = Deny (ADR-03/ADR-08 U4 — la restricción real ya usa el service tag AzureCloud.<region>, ver modules/compute-serverless)."
+  description  = "Impide crear o actualizar el config/web de func-novapay-pagos-{env}/func-novapay-pagos-canary-{env} sin ipSecurityRestrictionsDefaultAction = Deny (ADR-03/ADR-08 U4 — la restricción real ya usa el service tag AzureCloud.<region>, ver modules/compute-serverless)."
 
   policy_rule = file("${path.module}/../../policies/require-ip-restriction.json")
 }
