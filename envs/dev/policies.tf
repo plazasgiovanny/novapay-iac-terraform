@@ -25,6 +25,19 @@ resource "azurerm_policy_definition" "require_tags" {
   policy_rule = file("${path.module}/../../policies/require-tags.json")
 }
 
+# Ver comentario detallado en envs/prod/policies.tf sobre el alcance
+# acotado por nombre (func-novapay-pagos*) y la verificación real del
+# alias ARM contra la API de Microsoft.Web.
+resource "azurerm_policy_definition" "require_ip_restriction" {
+  name         = "novapay-require-ip-restriction-${var.environment}"
+  policy_type  = "Custom"
+  mode         = "Indexed"
+  display_name = "NovaPay - Exigir ip_restriction en Function Apps de pagos"
+  description  = "Impide crear o actualizar func-novapay-pagos-{env}/func-novapay-pagos-canary-{env} sin ipSecurityRestrictionsDefaultAction = Deny (ADR-03/ADR-08 U4 — la restricción real ya usa el service tag AzureCloud.<region>, ver modules/compute-serverless)."
+
+  policy_rule = file("${path.module}/../../policies/require-ip-restriction.json")
+}
+
 resource "azurerm_subscription_policy_assignment" "deny_public_sql" {
   name                 = "novapay-deny-public-sql-${var.environment}"
   policy_definition_id = azurerm_policy_definition.deny_public_sql.id
@@ -34,5 +47,11 @@ resource "azurerm_subscription_policy_assignment" "deny_public_sql" {
 resource "azurerm_subscription_policy_assignment" "require_tags" {
   name                 = "novapay-require-tags-${var.environment}"
   policy_definition_id = azurerm_policy_definition.require_tags.id
+  subscription_id      = data.azurerm_subscription.current.id
+}
+
+resource "azurerm_subscription_policy_assignment" "require_ip_restriction" {
+  name                 = "novapay-require-ip-restriction-${var.environment}"
+  policy_definition_id = azurerm_policy_definition.require_ip_restriction.id
   subscription_id      = data.azurerm_subscription.current.id
 }
