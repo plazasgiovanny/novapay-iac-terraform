@@ -106,16 +106,29 @@ data "azurerm_storage_account_sas" "package" {
   }
 }
 
+# HALLAZGO REAL (apply real fallido, release v1.0.23, 2026-08-17):
+# "os_type = Linux" con sku_name "Y1" (Dynamic) fue rechazado por
+# Azure con 400 BadRequest — "Requested features 'Dynamic SKU, Linux
+# Worker' not available in resource group rg-novapay-prod". Los planes
+# ya existentes en este resource group son FC1 (Flex Consumption,
+# compute-serverless) y S1 (Standard, compute-appservice) — nunca un
+# Y1/Dynamic clásico de ningún OS, y esta combinación puntual
+# (Dynamic + Linux) no está disponible aquí (mismo tipo de límite real
+# de la suscripción/región ya documentado varias veces en este
+# proyecto, no un error de configuración). Pivote real: Windows sí
+# está disponible con Dynamic SKU (el modelo Y1 más antiguo y más
+# ampliamente soportado de Azure Functions) — PowerShell corre igual
+# de bien ahí, sin cambiar el resto del diseño.
 resource "azurerm_service_plan" "this" {
   name                = "asp-novapay-rollback-${var.environment}"
   location            = var.location
   resource_group_name = var.resource_group_name
-  os_type             = "Linux"
+  os_type             = "Windows"
   sku_name            = "Y1"
   tags                = var.tags
 }
 
-resource "azurerm_linux_function_app" "this" {
+resource "azurerm_windows_function_app" "this" {
   name                 = "func-novapay-rollback-canary-${var.environment}"
   location             = var.location
   resource_group_name  = var.resource_group_name
@@ -158,7 +171,7 @@ resource "azurerm_linux_function_app" "this" {
 resource "azurerm_role_assignment" "storage_access" {
   scope                = azurerm_storage_account.this.id
   role_definition_name = "Storage Blob Data Owner"
-  principal_id         = azurerm_linux_function_app.this.identity[0].principal_id
+  principal_id         = azurerm_windows_function_app.this.identity[0].principal_id
 }
 
 # ADR-03 §2.6: rol acotado al recurso puntual de APIM, nunca al
@@ -167,7 +180,7 @@ resource "azurerm_role_assignment" "storage_access" {
 resource "azurerm_role_assignment" "apim_contributor" {
   scope                = var.apim_id
   role_definition_name = "API Management Service Contributor"
-  principal_id         = azurerm_linux_function_app.this.identity[0].principal_id
+  principal_id         = azurerm_windows_function_app.this.identity[0].principal_id
 }
 
 # HALLAZGO REAL esperado (mismo patrón ya documentado en
@@ -178,10 +191,10 @@ resource "azurerm_role_assignment" "apim_contributor" {
 # así que no debería colgarse — pero si el primer apply falla en este
 # punto, un segundo apply lo resuelve (igual que en api-management).
 data "azurerm_function_app_host_keys" "this" {
-  name                = azurerm_linux_function_app.this.name
+  name                = azurerm_windows_function_app.this.name
   resource_group_name = var.resource_group_name
 
-  depends_on = [azurerm_linux_function_app.this]
+  depends_on = [azurerm_windows_function_app.this]
 }
 
 # El Action Group de rollback llama a esta función vía HTTP POST — la
@@ -198,9 +211,9 @@ resource "azurerm_monitor_action_group" "this" {
 
   azure_function_receiver {
     name                     = "rollback-canary-function"
-    function_app_resource_id = azurerm_linux_function_app.this.id
+    function_app_resource_id = azurerm_windows_function_app.this.id
     function_name            = "RollbackCanary"
-    http_trigger_url         = "https://${azurerm_linux_function_app.this.default_hostname}/api/RollbackCanary?code=${data.azurerm_function_app_host_keys.this.default_function_key}"
+    http_trigger_url         = "https://${azurerm_windows_function_app.this.default_hostname}/api/RollbackCanary?code=${data.azurerm_function_app_host_keys.this.default_function_key}"
     use_common_alert_schema  = true
   }
 }
