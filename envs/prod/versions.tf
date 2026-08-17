@@ -31,6 +31,15 @@ terraform {
       source  = "hashicorp/archive"
       version = "~> 2.4"
     }
+    # Solo para el secreto real que gatea la ruta directa de
+    # verificación post-despliegue en modules/api-management (ver
+    # HALLAZGO REAL sobre azurerm_api_management_api_policy.confirmaciones
+    # — la verificación de cd.yml no podía alcanzar nunca la instancia
+    # en 0% de peso sin esto).
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
 
   # El estado vive en Azure Blob Storage, segmentado por ambiente. Los
