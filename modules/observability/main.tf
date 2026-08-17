@@ -181,6 +181,16 @@ resource "azurerm_role_assignment" "dcr_pesoactualizado_metrics_publisher" {
 # de peso) — un "scheduled query rule" no tiene forma de detener un
 # job de GitHub Actions en curso, solo de notificar; documentado así
 # para no sugerir un mecanismo de bloqueo que esta alerta no provee.
+#
+# HALLAZGO REAL (apply real fallido, release v1.0.21, 2026-08-17): la
+# primera versión de esta query comparaba "ResultCode >= 500" y Azure
+# la rechazó con 400 ("Cannot compare values of types string and
+# long") — en el esquema workspace-based de Application Insights,
+# ResultCode en AppRequests es de tipo string (p.ej. "200", "500"), no
+# numérico, pese a "parecer" un código HTTP entero. Fix real: envolver
+# en toint(ResultCode) antes de comparar. Mismo error se replicó (y se
+# corrigió igual) en los paneles 4 y 6 del Workbook, más abajo — todos
+# comparten la misma tabla y columna.
 resource "azurerm_monitor_scheduled_query_rules_alert_v2" "error_budget_burn_rate" {
   name                 = "alert-error-budget-burn-rate-${var.environment}"
   resource_group_name  = var.resource_group_name
@@ -196,7 +206,7 @@ resource "azurerm_monitor_scheduled_query_rules_alert_v2" "error_budget_burn_rat
     query                   = <<-KQL
       AppRequests
       | where TimeGenerated > ago(30d)
-      | summarize total = count(), errores = countif(ResultCode >= 500)
+      | summarize total = count(), errores = countif(toint(ResultCode) >= 500)
       | extend errorRate = errores * 100.0 / total
       | extend presupuestoConsumido = errorRate / 0.03 * 100
       | project presupuestoConsumido
@@ -298,7 +308,7 @@ locals {
       type = 3
       content = {
         version                 = "KqlItem/1.0"
-        query                   = "AppRequests\n| where AppRoleName == \"func-novapay-pagos\"\n| summarize total=count(), errores=countif(ResultCode >= 500) by AppRoleInstance, bin(TimeGenerated, 5m)\n| extend tasaError = errores * 100.0 / total\n| project TimeGenerated, AppRoleInstance, tasaError"
+        query                   = "AppRequests\n| where AppRoleName == \"func-novapay-pagos\"\n| summarize total=count(), errores=countif(toint(ResultCode) >= 500) by AppRoleInstance, bin(TimeGenerated, 5m)\n| extend tasaError = errores * 100.0 / total\n| project TimeGenerated, AppRoleInstance, tasaError"
         size                    = 0
         queryType               = 0
         resourceType            = "microsoft.operationalinsights/workspaces"
@@ -333,7 +343,7 @@ locals {
       type = 3
       content = {
         version                 = "KqlItem/1.0"
-        query                   = "AppRequests\n| where TimeGenerated > ago(30d)\n| summarize total=count(), errores=countif(ResultCode >= 500)\n| extend errorRate = errores * 100.0 / total\n| extend disponibilidad = 100 - errorRate\n| extend presupuestoConsumidoPct = errorRate / 0.03 * 100\n| project disponibilidad, SLO_disponibilidad = 99.97, presupuestoConsumidoPct"
+        query                   = "AppRequests\n| where TimeGenerated > ago(30d)\n| summarize total=count(), errores=countif(toint(ResultCode) >= 500)\n| extend errorRate = errores * 100.0 / total\n| extend disponibilidad = 100 - errorRate\n| extend presupuestoConsumidoPct = errorRate / 0.03 * 100\n| project disponibilidad, SLO_disponibilidad = 99.97, presupuestoConsumidoPct"
         size                    = 0
         queryType               = 0
         resourceType            = "microsoft.operationalinsights/workspaces"
