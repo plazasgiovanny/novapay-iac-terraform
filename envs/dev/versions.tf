@@ -18,6 +18,12 @@ terraform {
       source  = "Azure/azapi"
       version = "~> 2.0"
     }
+    # Ver envs/prod/versions.tf: solo para empaquetar el código
+    # embebido del Function App de rollback-canary (Bloque 2g U4).
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.4"
+    }
   }
 
   # El estado vive en Azure Blob Storage, segmentado por ambiente. Los
