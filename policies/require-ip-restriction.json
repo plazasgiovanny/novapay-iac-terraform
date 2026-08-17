@@ -3,15 +3,15 @@
     "allOf": [
       {
         "field": "type",
-        "equals": "Microsoft.Web/sites"
+        "equals": "Microsoft.Web/sites/config"
       },
       {
-        "field": "name",
-        "like": "func-novapay-pagos*"
+        "field": "id",
+        "like": "*/sites/func-novapay-pagos*/config/web"
       },
       {
         "not": {
-          "field": "Microsoft.Web/sites/siteConfig.ipSecurityRestrictionsDefaultAction",
+          "field": "Microsoft.Web/sites/config/web.ipSecurityRestrictionsDefaultAction",
           "equals": "Deny"
         }
       }

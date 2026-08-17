@@ -26,14 +26,15 @@ resource "azurerm_policy_definition" "require_tags" {
 }
 
 # Ver comentario detallado en envs/prod/policies.tf sobre el alcance
-# acotado por nombre (func-novapay-pagos*) y la verificación real del
-# alias ARM contra la API de Microsoft.Web.
+# acotado por nombre (func-novapay-pagos*), el hallazgo real del apply
+# fallido que forzó apuntar al sub-recurso config/web (no al recurso
+# raíz Microsoft.Web/sites) y la verificación real del alias ARM.
 resource "azurerm_policy_definition" "require_ip_restriction" {
   name         = "novapay-require-ip-restriction-${var.environment}"
   policy_type  = "Custom"
-  mode         = "Indexed"
+  mode         = "All"
   display_name = "NovaPay - Exigir ip_restriction en Function Apps de pagos"
-  description  = "Impide crear o actualizar func-novapay-pagos-{env}/func-novapay-pagos-canary-{env} sin ipSecurityRestrictionsDefaultAction = Deny (ADR-03/ADR-08 U4 — la restricción real ya usa el service tag AzureCloud.<region>, ver modules/compute-serverless)."
+  description  = "Impide crear o actualizar el config/web de func-novapay-pagos-{env}/func-novapay-pagos-canary-{env} sin ipSecurityRestrictionsDefaultAction = Deny (ADR-03/ADR-08 U4 — la restricción real ya usa el service tag AzureCloud.<region>, ver modules/compute-serverless)."
 
   policy_rule = file("${path.module}/../../policies/require-ip-restriction.json")
 }

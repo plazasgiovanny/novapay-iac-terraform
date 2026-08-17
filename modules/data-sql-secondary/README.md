@@ -9,7 +9,12 @@ Ninguna región distinta de `centralus` (la del servidor primario, `modules/data
 ## Resultado posible
 
 - **Si el apply tiene éxito**: la región es viable, se procede con la Etapa 2 en un módulo/PR aparte.
-- **Si el apply falla** por restricción de región/cuota: se prueba la siguiente región candidata: `northcentralus` → `canadacentral`. Si ninguna funciona, se degrada a Active Geo-Replication simple sin Failover Group (alternativa ya descrita en ADR-06) — no bloquea el resto del checklist de Fase 3.
+- **Si el apply falla** por restricción de región/cuota: se prueba la siguiente región candidata. Si ninguna funciona, se degrada a Active Geo-Replication simple sin Failover Group (alternativa ya descrita en ADR-06) — no bloquea el resto del checklist de Fase 3.
+
+## Historial real de regiones probadas
+
+- `northcentralus` — **descartada** (apply real fallido, 2026-08-17): `ProvisioningDisabled`, "Provisioning is restricted in this region" — mismo error que ya bloqueaba `eastus2`/`eastus`/`westus2`/`southcentralus` para el servidor primario.
+- `canadacentral` — candidata actual (`envs/prod/prod.tfvars`), sin probar todavía.
 
 ## Limpieza si no se avanza a la Etapa 2
 
