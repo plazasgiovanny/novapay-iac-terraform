@@ -18,6 +18,11 @@ variable "data_subnet_id" {
   type        = string
 }
 
+variable "primary_location" {
+  description = "Región PRIMARIA (var.location del ambiente, no de este módulo) — el recurso Private Endpoint en sí debe estar en la misma región que la VNet/subred que lo contiene (azurerm_private_endpoint.secondary), aunque el servidor SQL al que apunta esté en la región secundaria (var.location de este módulo). Distinta de var.location a propósito — confundirlas causó un apply real fallido (400 InvalidResourceReference), ver HALLAZGO REAL en main.tf."
+  type        = string
+}
+
 variable "private_dns_zone_id" {
   description = "ID de la zona DNS privada privatelink.database.windows.net ya creada por modules/data-sql (salida private_dns_zone_id) — se reutiliza la MISMA zona, no una nueva, para que el listener del failover group resuelva correctamente hacia el lado vigente tras una conmutación."
   type        = string

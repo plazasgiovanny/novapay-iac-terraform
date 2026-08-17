@@ -49,16 +49,22 @@ resource "azurerm_mssql_server" "secondary" {
   tags = var.tags
 }
 
-# Cross-región real: este Private Endpoint vive en la subred de datos
-# de la región PRIMARIA (centralus), apuntando a un servidor SQL en
-# canadacentral — verificado contra la documentación oficial de Azure
-# Private Link antes de asumirlo (Azure SQL Database está en la lista
-# de servicios que sí soportan Private Endpoint cross-región; Cosmos DB
-# y Key Vault, por ejemplo, no). No hace falta una VNet nueva en
-# canadacentral solo para esto.
+# HALLAZGO REAL (apply real fallido, release v1.0.26, 2026-08-17):
+# "location = var.location" usaba la región de ESTE módulo
+# (canadacentral, la del servidor secundario) para el propio recurso
+# Private Endpoint — Azure lo rechazó con 400 InvalidResourceReference:
+# "...VNET-NOVAPAY-SPOKE-PROD... was not found. Please make sure that
+# the referenced resource exists, and that both resources are in the
+# same region." El Private Endpoint cross-región SÍ es real (el
+# SERVIDOR de destino puede estar en otra región, confirmado contra
+# la documentación oficial antes de codificar), pero el recurso
+# Private Endpoint EN SÍ debe estar en la MISMA región que la VNet/
+# subred que lo contiene — es, en esencia, una NIC más dentro de esa
+# VNet. Fix real: var.primary_location (la región del servidor
+# PRIMARIO/de la VNet, no la de este módulo) en vez de var.location.
 resource "azurerm_private_endpoint" "secondary" {
   name                = "pe-sql-novapay-secondary-${var.environment}"
-  location            = var.location
+  location            = var.primary_location
   resource_group_name = var.resource_group_name
   subnet_id           = var.data_subnet_id
 
