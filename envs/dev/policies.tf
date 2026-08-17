@@ -36,7 +36,9 @@ resource "azurerm_policy_definition" "require_ip_restriction" {
   display_name = "NovaPay - Exigir ip_restriction en Function Apps de pagos"
   description  = "Impide crear o actualizar el config/web de func-novapay-pagos-{env}/func-novapay-pagos-canary-{env} sin ipSecurityRestrictionsDefaultAction = Deny (ADR-03/ADR-08 U4 — la restricción real ya usa el service tag AzureCloud.<region>, ver modules/compute-serverless)."
 
-  policy_rule = file("${path.module}/../../policies/require-ip-restriction.json")
+  policy_rule = templatefile("${path.module}/../../policies/require-ip-restriction.json.tpl", {
+    environment = var.environment
+  })
 }
 
 resource "azurerm_subscription_policy_assignment" "deny_public_sql" {

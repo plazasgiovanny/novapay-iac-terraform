@@ -6,8 +6,16 @@
         "equals": "Microsoft.Web/sites/config"
       },
       {
-        "field": "id",
-        "like": "*/sites/func-novapay-pagos*/config/web"
+        "anyOf": [
+          {
+            "field": "id",
+            "like": "*/func-novapay-pagos-${environment}/config/web"
+          },
+          {
+            "field": "id",
+            "like": "*/func-novapay-pagos-canary-${environment}/config/web"
+          }
+        ]
       },
       {
         "not": {

@@ -59,6 +59,18 @@ resource "azurerm_policy_definition" "require_tags" {
 # `az rest --method get --uri "https://management.azure.com/providers/Microsoft.Web?api-version=2021-04-01&$expand=resourceTypes/aliases"`
 # confirma "Microsoft.Web/sites/config/web.ipSecurityRestrictionsDefaultAction"
 # como alias válido para Azure Policy.
+#
+# HALLAZGO REAL #2 (apply real fallido, release v1.0.18, 2026-08-17):
+# el primer intento de este fix filtraba por "id like
+# */sites/func-novapay-pagos*/config/web" — dos caracteres '*'. Azure
+# rechaza la definición completa con 400 InvalidPolicyLikeOperator:
+# "like"/"notLike" solo admite UN wildcard. Como la definición nunca
+# llegó a actualizarse, la política vieja (la del HALLAZGO REAL de
+# arriba) siguió activa y volvió a bloquear las mismas escrituras
+# legítimas — mismo síntoma, causa distinta. Fix real: templatefile()
+# en vez de file() (interpola var.environment) + dos condiciones "like"
+# en "anyOf", una por cada Function App de pagos, cada una con un solo
+# wildcard al inicio — ver policies/require-ip-restriction.json.tpl.
 resource "azurerm_policy_definition" "require_ip_restriction" {
   name         = "novapay-require-ip-restriction-${var.environment}"
   policy_type  = "Custom"
@@ -66,7 +78,9 @@ resource "azurerm_policy_definition" "require_ip_restriction" {
   display_name = "NovaPay - Exigir ip_restriction en Function Apps de pagos"
   description  = "Impide crear o actualizar el config/web de func-novapay-pagos-{env}/func-novapay-pagos-canary-{env} sin ipSecurityRestrictionsDefaultAction = Deny (ADR-03/ADR-08 U4 — la restricción real ya usa el service tag AzureCloud.<region>, ver modules/compute-serverless)."
 
-  policy_rule = file("${path.module}/../../policies/require-ip-restriction.json")
+  policy_rule = templatefile("${path.module}/../../policies/require-ip-restriction.json.tpl", {
+    environment = var.environment
+  })
 }
 
 resource "azurerm_subscription_policy_assignment" "deny_public_sql" {
