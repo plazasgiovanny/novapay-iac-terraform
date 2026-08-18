@@ -20,9 +20,16 @@
 #   umbral que observe_and_guard en novapay-functions/cd.yml):
 #     NOVAPAY_APIM_KEY=... COUNT=60 DURATION_SECONDS=1200 ./load-generator.sh
 #
-#   Forzar el rollback automático (ráfaga de errores reales, no
-#   simulados — el guardrail de cd.yml exige >3% de error rate en 5 min):
-#     NOVAPAY_APIM_KEY=... COUNT=20 INTERVAL_SECONDS=1 ERROR_RATE_PCT=100 ./load-generator.sh
+#   ERROR_RATE_PCT NO sirve para forzar el rollback automático de
+#   cd.yml — HALLAZGO REAL (2026-08-17, verificado en Application
+#   Insights antes de corregir este comentario): un 400 devuelto
+#   deliberadamente por ValidatePayment (sin lanzar excepción) queda
+#   registrado con success="True" en Application Insights, sin
+#   importar el código HTTP. El guardrail de observe_and_guard
+#   (cd.yml) filtra success == false, así que nunca se dispara con
+#   este tipo de error — verificado con 230+ solicitudes reales sin
+#   ningún efecto. Para forzar el rollback de verdad hace falta un
+#   fallo real no controlado (5xx/timeout), ver PLAN.md §3.5.
 #
 #   Acumular >=100 muestras de SLI (puede correrse varias veces y sumar):
 #     NOVAPAY_APIM_KEY=... COUNT=100 INTERVAL_SECONDS=5 ./load-generator.sh
@@ -42,8 +49,11 @@ INTERVAL_SECONDS="${INTERVAL_SECONDS:-2}"
 # 0-100: porcentaje de solicitudes deliberadamente inválidas (Amount
 # por encima de Payments:MaxTransactionAmount, ver
 # AccountValidationService.cs en novapay-functions) — provoca un 400
-# real, no un fallo simulado. Cuenta como "success=false" en
-# Application Insights igual que cualquier otro error real.
+# real, no un fallo simulado. Útil para acumular muestras de tasa de
+# error real observable end-to-end, pero NO cuenta como
+# "success=false" en Application Insights (ValidatePayment maneja la
+# validación sin lanzar excepción) — no sirve para disparar el
+# guardrail de error rate de cd.yml, ver PLAN.md §3.5.
 ERROR_RATE_PCT="${ERROR_RATE_PCT:-0}"
 CURRENCY="${CURRENCY:-COP}"
 
