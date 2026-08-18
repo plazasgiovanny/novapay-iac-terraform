@@ -21,7 +21,8 @@ El código cubre la VNet spoke, sus subredes y NSG, el backend transaccional (Ap
 │   ├── dev/                   # Composición de menor costo, sin redundancia zonal
 │   └── prod/                  # SKU de mayor capacidad, redundancia zonal, retención >= 5 años
 ├── policies/                  # Reglas de Azure Policy (policy-as-code) referenciadas desde envs/*/policies.tf
-└── sql/                       # Scripts T-SQL versionados, fuera del ciclo de vida de azurerm
+├── sql/                       # Scripts T-SQL versionados, fuera del ciclo de vida de azurerm
+└── docs/adr/                  # Architecture Decision Records: el porqué de cada decisión de diseño
 ```
 
 El código de aplicación del flujo serverless (`ValidatePayment`/`ProcessPayment`) vivía en este repo hasta la Unidad 4 (`functions/NovaPay.Payments/`); se extrajo a un repositorio propio, [`novapay-functions`](https://github.com/plazasgiovanny/novapay-functions), con cadencia de release independiente de la infraestructura. Este repo aprovisiona el *shell* del recurso (runtime, integración VNet, identidad, escalado); `novapay-functions` gestiona y despliega el código que corre dentro.
